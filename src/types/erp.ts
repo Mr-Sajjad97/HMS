@@ -5,11 +5,19 @@
 export type StaffRole =
   | 'ADMIN'
   | 'DOCTOR'
+  | 'NURSE'
   | 'LAB_TECH'
   | 'PHARMACIST'
   | 'CASHIER'
   | 'ACCOUNTANT'
-  | 'HR_MANAGER';
+  | 'HR_MANAGER'
+  | 'RECEPTIONIST'
+  | 'COOK'
+  | 'SWEEPER'
+  | 'WARD_BOY'
+  | 'SECURITY'
+  | 'DRIVER'
+  | 'OTHER';
 
 export type ClientFormFactor = 'LAN_WEB' | 'WINDOWS_DESKTOP' | 'MOBILE_LAN';
 
@@ -22,6 +30,11 @@ export interface HospitalSettings {
   dbBindAddress: string;
   walArchivingEnabled: boolean;
   simulatedInternetOffline: boolean;
+  adminFullName?: string;
+  adminEmail?: string;
+  adminUsername?: string;
+  adminPassword?: string;
+  securityPin?: string;
   updatedAt: string;
 }
 
@@ -270,6 +283,26 @@ export interface BackupRecord {
   encryptedPayloadHex?: string;
   ivHex?: string;
   authTagHex?: string;
+}
+
+export interface SupplierBill {
+  id: string;
+  billNo: string;
+  supplierId: string;
+  supplierName: string;
+  batchId: string;
+  brandName: string;
+  genericName: string;
+  batchNo: string;
+  qty: number;
+  unitCost: number;
+  retailPrice: number;
+  totalBill: number;
+  paidAmount: number;
+  remainingAmount: number;
+  status: 'PAID' | 'PARTIAL' | 'UNPAID';
+  businessDate: string;
+  createdAt: string;
 }
 
 export interface AcceptanceTestItem {

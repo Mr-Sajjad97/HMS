@@ -1,6 +1,8 @@
 {
-  "name": "Hospital ERP — Developed by Sajjad Qaiser Shah",
+  "name": "HMS— Developed by Sajjad Qaiser Shah",
   "description": "Single-hospital Enterprise Resource Planning system for OPD, IPD, Laboratory, Pharmacy POS, Double-Entry Accounting, HR/Payroll, Encrypted Backups, and LAN Operations — Developed by Sajjad Qaiser Shah.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

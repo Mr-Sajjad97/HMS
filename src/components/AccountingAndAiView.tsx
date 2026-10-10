@@ -28,7 +28,12 @@ interface AccountingAndAiViewProps {
     endDate: string;
     dateBasis: 'businessDate' | 'paymentDate';
   }) => void;
-  onAskAi: (prompt: string, forceOfflineFallback: boolean) => Promise<any>;
+  onAskAi: (
+    prompt: string,
+    forceOfflineFallback: boolean,
+    useMapsGrounding?: boolean,
+    latLng?: { latitude: number; longitude: number }
+  ) => Promise<any>;
 }
 
 export const AccountingAndAiView: React.FC<AccountingAndAiViewProps> = ({
@@ -44,11 +49,17 @@ export const AccountingAndAiView: React.FC<AccountingAndAiViewProps> = ({
     'Summarize Hospital, Laboratory, and Pharmacy profitability and highlight any expiring medicine batches.'
   );
   const [aiLoading, setAiLoading] = useState(false);
+  const [useMapsGrounding, setUseMapsGrounding] = useState(false);
   const [aiResult, setAiResult] = useState<{
     source: string;
     roleChecked: string;
     safeFallbackUsed: boolean;
     answer: string;
+    mapLinks?: Array<{
+      title: string;
+      uri: string;
+      reviewSnippets: string[];
+    }>;
   } | null>(null);
   const [forceOfflineTest, setForceOfflineTest] = useState(false);
 
@@ -56,7 +67,21 @@ export const AccountingAndAiView: React.FC<AccountingAndAiViewProps> = ({
     e.preventDefault();
     setAiLoading(true);
     try {
-      const res = await onAskAi(aiPrompt, forceOfflineTest);
+      let coords: { latitude: number; longitude: number } | undefined;
+      if (useMapsGrounding && typeof navigator !== 'undefined' && navigator.geolocation) {
+        coords = await new Promise<{ latitude: number; longitude: number } | undefined>((resolve) => {
+          navigator.geolocation.getCurrentPosition(
+            (pos) =>
+              resolve({
+                latitude: pos.coords.latitude,
+                longitude: pos.coords.longitude,
+              }),
+            () => resolve(undefined),
+            { timeout: 3000 }
+          );
+        });
+      }
+      const res = await onAskAi(aiPrompt, forceOfflineTest, useMapsGrounding, coords);
       setAiResult(res);
     } finally {
       setAiLoading(false);
@@ -75,8 +100,7 @@ export const AccountingAndAiView: React.FC<AccountingAndAiViewProps> = ({
               01. Double-Entry General Ledger & Segmented Profitability
             </h2>
             <p className="text-xs text-slate-600 mt-1">
-              Separate Business Dates, Entry Timestamps, and Payment Dates · Internal Transfers & Capital Purchases Excluded from Revenue/Expense ·{' '}
-              <span className="font-semibold text-slate-900">Developed by Sajjad Qaiser Shah</span>
+              Separate Business Dates, Entry Timestamps, and Payment Dates · Internal Transfers & Capital Purchases Excluded from Revenue/Expense
             </p>
           </div>
 
@@ -313,23 +337,34 @@ export const AccountingAndAiView: React.FC<AccountingAndAiViewProps> = ({
                 value={aiPrompt}
                 onChange={(e) => setAiPrompt(e.target.value)}
                 className="w-full px-3 py-2 text-xs border border-slate-200 rounded-md text-slate-900 focus:outline-none focus:border-slate-900"
-                placeholder="Ask about departmental revenue, expiry alerts, or clinical throughput..."
+                placeholder="Ask about departmental revenue, expiry alerts, or nearby referral hospitals & pharmacy suppliers..."
               />
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={forceOfflineTest || settings.simulatedInternetOffline}
-                    onChange={(e) => setForceOfflineTest(e.target.checked)}
-                    className="rounded border-slate-300"
-                  />
-                  <span>Simulate External AI Outage (Safe Local Fallback)</span>
-                </label>
+                <div className="flex flex-col gap-1.5">
+                  <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={useMapsGrounding}
+                      onChange={(e) => setUseMapsGrounding(e.target.checked)}
+                      className="rounded border-slate-300"
+                    />
+                    <span>Enable Google Maps Grounding (Nearby Hospitals, Labs &amp; Suppliers)</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={forceOfflineTest || settings.simulatedInternetOffline}
+                      onChange={(e) => setForceOfflineTest(e.target.checked)}
+                      className="rounded border-slate-300"
+                    />
+                    <span>Simulate External AI Outage (Safe Local Fallback)</span>
+                  </label>
+                </div>
 
                 <button
                   type="submit"
                   disabled={aiLoading}
-                  className="px-4 py-2 text-xs font-medium text-white bg-slate-900 rounded-md hover:bg-slate-800 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-50"
+                  className="h-9 px-4 text-xs font-medium text-white bg-slate-900 rounded-md hover:bg-slate-800 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-50"
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>{aiLoading ? 'Analyzing Ledger...' : 'Generate Authorized Report'}</span>
@@ -353,6 +388,32 @@ export const AccountingAndAiView: React.FC<AccountingAndAiViewProps> = ({
                 <div className="whitespace-pre-wrap text-slate-800 leading-relaxed font-sans">
                   {aiResult.answer}
                 </div>
+                {aiResult.mapLinks && aiResult.mapLinks.length > 0 && (
+                  <div className="pt-2 border-t border-slate-200 space-y-1.5">
+                    <div className="font-semibold text-slate-900">
+                      Google Maps Grounded Locations:
+                    </div>
+                    <ul className="space-y-1.5">
+                      {aiResult.mapLinks.map((m, idx) => (
+                        <li key={idx} className="space-y-0.5">
+                          <a
+                            href={m.uri}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[#1D5464] font-semibold underline hover:text-[#16424F]"
+                          >
+                            {m.title}
+                          </a>
+                          {m.reviewSnippets && m.reviewSnippets.length > 0 && (
+                            <div className="text-[11px] text-slate-600 pl-2">
+                              {m.reviewSnippets.join(' · ')}
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
           </div>

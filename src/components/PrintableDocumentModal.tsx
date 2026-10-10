@@ -2,8 +2,18 @@
  * Protected Printable Clinical & Financial Document Viewer
  * Branded with: Developed by Sajjad Qaiser Shah
  */
-import React from 'react';
-import { Printer, X, ShieldCheck, CheckCircle2, FileText } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  Printer,
+  X,
+  Minus,
+  Maximize2,
+  Minimize2,
+  ArrowLeft,
+  ShieldCheck,
+  CheckCircle2,
+  FileText,
+} from 'lucide-react';
 import type { Invoice, LabOrder, SalarySlip, HospitalSettings } from '../types/erp.ts';
 
 export type PrintableDocPayload =
@@ -22,33 +32,117 @@ export const PrintableDocumentModal: React.FC<PrintableDocumentModalProps> = ({
   settings,
   onClose,
 }) => {
+  const [isMinimized, setIsMinimized] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  useEffect(() => {
+    setIsMinimized(false);
+  }, [docPayload]);
+
   if (!docPayload) return null;
 
   const handlePrint = () => {
     window.print();
   };
 
+  const docTitle =
+    docPayload.type === 'INVOICE'
+      ? `Receipt #${docPayload.data.invoiceNo}`
+      : docPayload.type === 'LAB_REPORT'
+      ? `Lab Report #${docPayload.data.orderNo}`
+      : `Salary Slip (${docPayload.data.employeeName})`;
+
+  if (isMinimized) {
+    return (
+      <div className="fixed bottom-4 left-4 z-50 bg-[#1D5464] text-white rounded-xl shadow-xl border border-white/20 px-3.5 py-2 flex items-center gap-2.5 text-xs no-print">
+        <FileText className="w-4 h-4 text-teal-200 shrink-0" />
+        <span className="font-semibold whitespace-nowrap">{docTitle}</span>
+        <button
+          type="button"
+          onClick={() => {
+            setIsMinimized(false);
+            setIsFullScreen(false);
+          }}
+          className="h-7 w-7 rounded bg-white/15 hover:bg-white/25 text-white inline-flex items-center justify-center cursor-pointer"
+          title="Restore Window"
+        >
+          <Maximize2 className="w-3.5 h-3.5" />
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          className="h-7 w-7 rounded bg-rose-600 hover:bg-rose-700 text-white inline-flex items-center justify-center cursor-pointer"
+          aria-label="Close document"
+          title="Close (✕)"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 overflow-y-auto">
-      <div className="bg-white border border-slate-200 rounded-lg max-w-3xl w-full p-6 md:p-8 shadow-sm my-8">
-        {/* Top Action Bar */}
-        <div className="flex items-center justify-between pb-4 mb-6 border-b border-slate-200 no-print">
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 overflow-y-auto ${
+        isFullScreen ? 'p-0' : 'p-4'
+      }`}
+    >
+      <div
+        className={`bg-white border border-slate-200 shadow-sm ${
+          isFullScreen
+            ? 'w-screen min-h-screen max-w-none rounded-none p-6 md:p-10 m-0'
+            : 'rounded-lg max-w-3xl w-full p-6 md:p-8 my-8'
+        }`}
+      >
+        {/* Clean Laptop Window Title Bar: ← Back on left, — □ ✕ icons on right */}
+        <div className="flex items-center justify-between gap-2 pb-3 mb-6 border-b border-slate-200 no-print">
           <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-            <FileText className="w-4 h-4 text-slate-900" />
-            <span>Protected Hospital Document · Audit-Locked Record</span>
-          </div>
-          <div className="flex items-center gap-3">
             <button
+              type="button"
+              onClick={onClose}
+              className="h-8 w-8 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 inline-flex items-center justify-center cursor-pointer transition-colors"
+              title="Back (←)"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <FileText className="w-4 h-4 text-slate-900" />
+            <span className="font-bold text-slate-900">{docTitle}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
               onClick={handlePrint}
-              className="px-4 py-2 text-xs font-medium text-white bg-slate-900 rounded-md hover:bg-slate-800 transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer"
+              className="h-8 px-3 text-xs font-semibold text-white bg-[#1D5464] rounded-md hover:bg-[#16424F] transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer mr-1"
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>Print Official Copy</span>
+              <span>Print Copy</span>
             </button>
             <button
+              type="button"
+              onClick={() => setIsMinimized(true)}
+              className="h-8 w-8 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 inline-flex items-center justify-center cursor-pointer transition-colors"
+              title="Minimize (—)"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsFullScreen((prev) => !prev)}
+              className="h-8 w-8 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 inline-flex items-center justify-center cursor-pointer transition-colors"
+              title={isFullScreen ? 'Restore Down' : 'Maximize / Full Screen'}
+            >
+              {isFullScreen ? (
+                <Minimize2 className="w-3.5 h-3.5" />
+              ) : (
+                <Maximize2 className="w-3.5 h-3.5" />
+              )}
+            </button>
+            <button
+              type="button"
               onClick={onClose}
-              className="p-2 text-slate-500 hover:text-slate-900 rounded-md transition-colors cursor-pointer"
+              className="h-8 w-8 rounded-md bg-rose-600 hover:bg-rose-700 text-white inline-flex items-center justify-center cursor-pointer transition-colors"
               aria-label="Close document"
+              title="Close (✕)"
             >
               <X className="w-4 h-4" />
             </button>

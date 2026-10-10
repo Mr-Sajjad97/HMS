@@ -31,6 +31,31 @@ import {
   LogOut,
   Barcode,
   ArrowRightLeft,
+  LayoutGrid,
+  Users,
+  Calendar,
+  FileText,
+  CreditCard,
+  Settings,
+  Search,
+  Bell,
+  MessageSquare,
+  ChevronDown,
+  Download,
+  Lock,
+  KeyRound,
+  Upload,
+  History,
+  UserPlus,
+  Wallet,
+  Trash2,
+  RotateCcw,
+  FolderCheck,
+  Minus,
+  Maximize2,
+  Minimize2,
+  ArrowLeft,
+  X,
 } from 'lucide-react';
 import {
   PrintableDocumentModal,
@@ -68,6 +93,7 @@ import type {
   SalarySlip,
   AuditLogEntry,
   BackupRecord,
+  SupplierBill,
   AcceptanceTestItem,
 } from './types/erp.ts';
 
@@ -84,6 +110,11 @@ export default function App() {
   const [activeRole, setActiveRole] = useState<StaffRole>('ADMIN');
   const [clientMode, setClientMode] = useState<ClientFormFactor>('LAN_WEB');
   const [activeModule, setActiveModule] = useState<WorkspaceModule>('home');
+  const [activeSidebarKey, setActiveSidebarKey] = useState<string>('dashboard');
+  const [moduleHistory, setModuleHistory] = useState<WorkspaceModule[]>([]);
+  const [minimizedModules, setMinimizedModules] = useState<WorkspaceModule[]>([]);
+  const [isModuleFullScreen, setIsModuleFullScreen] = useState<boolean>(false);
+  const [globalSearchQuery, setGlobalSearchQuery] = useState<string>('');
 
   const [loading, setLoading] = useState<boolean>(true);
   const [statusBanner, setStatusBanner] = useState<{
@@ -115,7 +146,44 @@ export default function App() {
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [salarySlips, setSalarySlips] = useState<SalarySlip[]>([]);
+  const [supplierBills, setSupplierBills] = useState<SupplierBill[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+
+  // Security Login, Custom Admin Account & PIN Lock State
+  const [isLocked, setIsLocked] = useState<boolean>(false);
+  const [isLockModalMinimized, setIsLockModalMinimized] = useState<boolean>(false);
+  const [isLockModalFullScreen, setIsLockModalFullScreen] = useState<boolean>(false);
+  const [securityPin, setSecurityPin] = useState<string>('1234');
+  const [loginMode, setLoginMode] = useState<'PIN' | 'PASSWORD' | 'CREATE_ADMIN'>('PIN');
+  const [pinInput, setPinInput] = useState<string>('');
+  const [usernameInput, setUsernameInput] = useState<string>('');
+  const [passwordInput, setPasswordInput] = useState<string>('');
+  const [loginError, setLoginError] = useState<string>('');
+  const [showChangePinModal, setShowChangePinModal] = useState<boolean>(false);
+  const [isChangePinMinimized, setIsChangePinMinimized] = useState<boolean>(false);
+  const [isChangePinFullScreen, setIsChangePinFullScreen] = useState<boolean>(false);
+  const [oldPinInput, setOldPinInput] = useState<string>('');
+  const [newPinInput, setNewPinInput] = useState<string>('');
+  const [confirmNewPinInput, setConfirmNewPinInput] = useState<string>('');
+  const [pinModalError, setPinModalError] = useState<string>('');
+  const [showAdminAccountModal, setShowAdminAccountModal] = useState<boolean>(false);
+  const [isAdminModalMinimized, setIsAdminModalMinimized] = useState<boolean>(false);
+  const [isAdminModalFullScreen, setIsAdminModalFullScreen] = useState<boolean>(false);
+  const [isAppMinimized, setIsAppMinimized] = useState<boolean>(false);
+  const [isAppExited, setIsAppExited] = useState<boolean>(false);
+  const [isAppFullScreen, setIsAppFullScreen] = useState<boolean>(false);
+  const [adminAccountForm, setAdminAccountForm] = useState({
+    adminFullName: 'Hospital Administrator',
+    adminEmail: 'admin@hospital.local',
+    adminUsername: 'admin',
+    adminPassword: '',
+    currentPinOrPassword: '',
+  });
+  const [loggedInStaffName, setLoggedInStaffName] = useState<string>('Hospital Administrator');
+  const [loggedInStaffEmail, setLoggedInStaffEmail] = useState<string>('admin@hospital.local');
+  const [showVitalsTracker, setShowVitalsTracker] = useState<boolean>(false);
+  const [staffDesignationPreset, setStaffDesignationPreset] = useState<string>('Doctor / Medical Officer');
+  const [customStaffDesignation, setCustomStaffDesignation] = useState<string>('');
   const [backups, setBackups] = useState<BackupRecord[]>([]);
   const [acceptanceTests, setAcceptanceTests] = useState<AcceptanceTestItem[]>([]);
   const [analytics, setAnalytics] = useState<any>({
@@ -227,20 +295,76 @@ export default function App() {
   ]);
 
   const [grnForm, setGrnForm] = useState({
-    sku: 'MED-OMEP-40',
-    genericName: 'Omeprazole 40mg Capsule',
-    brandName: 'Risek 40mg Caps (Pack of 14)',
-    batchNo: 'B26-RK44',
-    category: 'Gastrointestinal',
+    sku: 'MED-PANA-500',
+    genericName: 'Paracetamol 500mg',
+    brandName: 'Panadol 500mg Tablet',
+    batchNo: 'B26-PN10',
+    category: 'Tablet',
     expiryDate: '2028-09-30',
-    qty: 60,
-    unitCost: 350,
-    retailPrice: 520,
-    wholesalePrice: 440,
+    qty: 10,
+    unitCost: 35,
+    retailPrice: 50,
+    wholesalePrice: 35,
     supplierId: 'SUP-01',
-    paymentMethod: 'CREDIT_LEDGER',
+    supplierName: 'AGP Pharma Distributors',
+    paidAmount: 350,
+    paymentMethod: 'CASH',
     businessDate: '2026-10-10',
   });
+
+  // Pharmacy Search & Filter State
+  const [pharmacySearch, setPharmacySearch] = useState<string>('');
+  const [pharmacyFilter, setPharmacyFilter] = useState<
+    'ALL' | 'IN_STOCK' | 'LOW_OR_OUT' | 'EXPIRING_OR_EXPIRED'
+  >('ALL');
+
+  // Direct Customer Billing Form
+  const [customerBillForm, setCustomerBillForm] = useState({
+    customerName: 'Walk-in Patient / Customer',
+    department: 'HOSPITAL_OPD' as 'HOSPITAL_OPD' | 'HOSPITAL_IPD' | 'LABORATORY',
+    description: 'OPD Consultation & Clinical Procedure',
+    qty: 1,
+    unitPrice: 1500,
+    discount: 0,
+    paidAmount: 1500,
+    paymentMethod: 'CASH',
+    businessDate: '2026-10-10',
+  });
+
+  // Add New Staff Member Form
+  const [newStaffForm, setNewStaffForm] = useState({
+    fullName: '',
+    designation: 'Staff Nurse / Medical Officer',
+    department: 'HOSPITAL' as 'HOSPITAL' | 'LABORATORY' | 'PHARMACY' | 'SHARED_ADMIN',
+    role: 'DOCTOR' as StaffRole,
+    baseSalary: 55000,
+    allowance: 5000,
+    deduction: 0,
+    bankAccount: 'Cash / Payroll Counter',
+  });
+
+  // Complete History Filter State
+  const [historyTypeFilter, setHistoryTypeFilter] = useState<
+    'ALL' | 'INVOICE' | 'PHARMACY' | 'SUPPLIER_BILL' | 'PAYROLL' | 'EXPENSE'
+  >('ALL');
+  const [historySearch, setHistorySearch] = useState<string>('');
+
+  // Module-Specific Search Filters & Auto-Backup State
+  const [patientSearch, setPatientSearch] = useState<string>('');
+  const [encounterSearch, setEncounterSearch] = useState<string>('');
+  const [labSearch, setLabSearch] = useState<string>('');
+  const [pharmacySaleSearch, setPharmacySaleSearch] = useState<string>('');
+  const [supplierBillSearch, setSupplierBillSearch] = useState<string>('');
+  const [staffSearch, setStaffSearch] = useState<string>('');
+  const [billingSearch, setBillingSearch] = useState<string>('');
+  const [expenseSearch, setExpenseSearch] = useState<string>('');
+  const [laptopDirHandle, setLaptopDirHandle] = useState<any>(null);
+  const [laptopFolderName, setLaptopFolderName] = useState<string>(
+    'data/Laptop_Auto_Backups (Auto-Saved on Every Entry)'
+  );
+  const [lastAutoSavedTime, setLastAutoSavedTime] = useState<string>(
+    new Date().toLocaleTimeString()
+  );
 
   const [transferForm, setTransferForm] = useState({
     batchId: 'BAT-501',
@@ -272,11 +396,13 @@ export default function App() {
   // Build request headers including role, actor identity, and optional idempotency key
   const buildHeaders = useCallback(
     async (idempotencyKey?: string) => {
+      const activeEmail =
+        loggedInStaffEmail || settings.adminEmail || 'admin@hospital.local';
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         'X-ERP-Role': activeRole,
         'X-ERP-UID': user?.uid || 'lan_operator_01',
-        'X-ERP-Email': user?.email || 'sajjadshaha58@gmail.com',
+        'X-ERP-Email': activeEmail,
       };
       if (idempotencyKey) {
         headers['X-Idempotency-Key'] = idempotencyKey;
@@ -291,7 +417,7 @@ export default function App() {
       }
       return headers;
     },
-    [activeRole, user, settings.simulatedInternetOffline]
+    [activeRole, user, settings.simulatedInternetOffline, settings.adminEmail, loggedInStaffEmail]
   );
 
   const fetchBootstrap = useCallback(
@@ -308,6 +434,21 @@ export default function App() {
         const data = await res.json();
         const st = data.state;
         setSettings(st.settings);
+        if (st.settings?.securityPin) {
+          setSecurityPin(st.settings.securityPin);
+        }
+        if (st.settings?.adminFullName) {
+          setLoggedInStaffName(st.settings.adminFullName);
+        }
+        if (st.settings?.adminEmail) {
+          setLoggedInStaffEmail(st.settings.adminEmail);
+        }
+        setAdminAccountForm((prev) => ({
+          ...prev,
+          adminFullName: st.settings?.adminFullName || 'Hospital Administrator',
+          adminEmail: st.settings?.adminEmail || 'admin@hospital.local',
+          adminUsername: st.settings?.adminUsername || 'admin',
+        }));
         setDoctors(st.doctors);
         setPatients(st.patients);
         setVitalSigns(st.vitalSigns || []);
@@ -320,10 +461,38 @@ export default function App() {
         setExpenses(st.expenses);
         setEmployees(st.employees);
         setSalarySlips(st.salarySlips);
+        setSupplierBills(st.supplierBills || []);
         setAuditLogs(st.auditLogs);
         setBackups(st.backups);
         setAcceptanceTests(st.acceptanceTests || []);
         setAnalytics(data.analytics);
+        setLastAutoSavedTime(new Date().toLocaleTimeString());
+
+        // If user linked a direct Laptop folder via File System Access API, auto-write latest JSON & CSV silently
+        if (laptopDirHandle) {
+          try {
+            const jsonFileHandle = await laptopDirHandle.getFileHandle(
+              'Al_Hikmat_Auto_Backup_Latest.json',
+              { create: true }
+            );
+            const writableJson = await jsonFileHandle.createWritable();
+            await writableJson.write(
+              JSON.stringify(
+                {
+                  backupFormat: 'AL_HIKMAT_HMS_LAPTOP_BACKUP_V1',
+                  autoSavedAt: new Date().toISOString(),
+                  hospitalName: st.settings?.hospitalName || 'Al-Hikmat General Hospital',
+                  state: st,
+                },
+                null,
+                2
+              )
+            );
+            await writableJson.close();
+          } catch {
+            // Ignore browser permission prompts during background sync
+          }
+        }
       } catch (err: any) {
         notify('error', err.message || 'Could not reach local ERP server.');
       } finally {
@@ -336,6 +505,232 @@ export default function App() {
   useEffect(() => {
     fetchBootstrap();
   }, [fetchBootstrap]);
+
+  // Restore Auto-Saved Form Drafts & Active Workspace on Initial Load
+  useEffect(() => {
+    try {
+      const rawDrafts = localStorage.getItem('al_hikmat_hms_autosave_drafts_v1');
+      if (!rawDrafts) return;
+      const saved = JSON.parse(rawDrafts);
+      if (saved.activeModule) setActiveModule(saved.activeModule);
+      if (saved.activeSidebarKey) setActiveSidebarKey(saved.activeSidebarKey);
+      if (saved.patientForm) setPatientForm((prev) => ({ ...prev, ...saved.patientForm }));
+      if (saved.vitalForm) setVitalForm((prev) => ({ ...prev, ...saved.vitalForm }));
+      if (saved.encounterForm) setEncounterForm((prev) => ({ ...prev, ...saved.encounterForm }));
+      if (saved.labForm) setLabForm((prev) => ({ ...prev, ...saved.labForm }));
+      if (saved.posCustomerName) setPosCustomerName(saved.posCustomerName);
+      if (saved.posPaymentMethod) setPosPaymentMethod(saved.posPaymentMethod);
+      if (saved.grnForm) setGrnForm((prev) => ({ ...prev, ...saved.grnForm }));
+      if (saved.customerBillForm)
+        setCustomerBillForm((prev) => ({ ...prev, ...saved.customerBillForm }));
+      if (saved.newStaffForm) setNewStaffForm((prev) => ({ ...prev, ...saved.newStaffForm }));
+      if (saved.staffDesignationPreset) setStaffDesignationPreset(saved.staffDesignationPreset);
+      if (saved.customStaffDesignation !== undefined)
+        setCustomStaffDesignation(saved.customStaffDesignation);
+      if (saved.expenseForm) setExpenseForm((prev) => ({ ...prev, ...saved.expenseForm }));
+    } catch {
+      // Ignore malformed localStorage drafts
+    }
+  }, []);
+
+  // Real-Time Auto-Save of All Form Inputs & Workspace State on Every Change
+  useEffect(() => {
+    if (loading) return;
+    try {
+      const draftPayload = {
+        savedAt: new Date().toISOString(),
+        activeModule,
+        activeSidebarKey,
+        patientForm,
+        vitalForm,
+        encounterForm,
+        labForm,
+        posCustomerName,
+        posPaymentMethod,
+        grnForm,
+        customerBillForm,
+        newStaffForm,
+        staffDesignationPreset,
+        customStaffDesignation,
+        expenseForm,
+      };
+      localStorage.setItem('al_hikmat_hms_autosave_drafts_v1', JSON.stringify(draftPayload));
+      setLastAutoSavedTime(new Date().toLocaleTimeString());
+    } catch {
+      // Ignore storage quota limits
+    }
+  }, [
+    loading,
+    activeModule,
+    activeSidebarKey,
+    patientForm,
+    vitalForm,
+    encounterForm,
+    labForm,
+    posCustomerName,
+    posPaymentMethod,
+    grnForm,
+    customerBillForm,
+    newStaffForm,
+    staffDesignationPreset,
+    customStaffDesignation,
+    expenseForm,
+  ]);
+
+  // Listen to native browser Fullscreen changes
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsAppFullScreen(Boolean(document.fullscreenElement));
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  const getModuleMeta = useCallback((mod: WorkspaceModule) => {
+    switch (mod) {
+      case 'home':
+        return { key: 'dashboard', label: 'Dashboard (Consolidated Profit & Loss)' };
+      case 'pharmacy':
+        return { key: 'records', label: 'Pharmacy & Medicine Stock' };
+      case 'billing_hr':
+        return { key: 'billing', label: 'Customer Billing, Staff & Salary' };
+      case 'laboratory':
+        return { key: 'laboratory', label: 'Laboratory Billing & Diagnostics' };
+      case 'clinical':
+        return { key: 'patients', label: 'Patients Registry & OPD/IPD' };
+      case 'accounting_security':
+        return { key: 'settings', label: 'History, Audit Log & Laptop Backups' };
+      default:
+        return { key: 'dashboard', label: 'Dashboard (P&L)' };
+    }
+  }, []);
+
+  const navigateToOption = useCallback(
+    (nextMod: WorkspaceModule) => {
+      setMinimizedModules((prev) => prev.filter((m) => m !== nextMod));
+      if (nextMod !== activeModule) {
+        setModuleHistory((prev) => [...prev.slice(-15), activeModule]);
+        setActiveModule(nextMod);
+        setActiveSidebarKey(getModuleMeta(nextMod).key);
+      }
+    },
+    [activeModule, getModuleMeta]
+  );
+
+  const handleGoBackOption = useCallback(() => {
+    if (moduleHistory.length > 0) {
+      const prevMod = moduleHistory[moduleHistory.length - 1];
+      setModuleHistory((prev) => prev.slice(0, -1));
+      setActiveModule(prevMod);
+      setActiveSidebarKey(getModuleMeta(prevMod).key);
+    } else if (activeModule !== 'home') {
+      setActiveModule('home');
+      setActiveSidebarKey('dashboard');
+    } else if (isModuleFullScreen || isAppFullScreen) {
+      setIsModuleFullScreen(false);
+      setIsAppFullScreen(false);
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+  }, [moduleHistory, activeModule, getModuleMeta, isModuleFullScreen, isAppFullScreen]);
+
+  const handleMinimizeCurrentOption = useCallback(async () => {
+    await autoSaveAdminProfileSilently();
+    if (activeModule !== 'home') {
+      const current = activeModule;
+      setMinimizedModules((prev) => (prev.includes(current) ? prev : [...prev, current]));
+      if (moduleHistory.length > 0) {
+        const prevMod = moduleHistory[moduleHistory.length - 1];
+        setModuleHistory((prev) => prev.slice(0, -1));
+        setActiveModule(prevMod);
+        setActiveSidebarKey(getModuleMeta(prevMod).key);
+      } else {
+        setActiveModule('home');
+        setActiveSidebarKey('dashboard');
+      }
+    } else {
+      setIsAppMinimized(true);
+    }
+  }, [activeModule, moduleHistory, getModuleMeta]);
+
+  const toggleBrowserFullScreen = async () => {
+    const nextState = !isModuleFullScreen && !isAppFullScreen;
+    setIsModuleFullScreen(nextState);
+    setIsAppFullScreen(nextState);
+    try {
+      if (nextState && !document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+      } else if (!nextState && document.fullscreenElement) {
+        await document.exitFullscreen();
+      }
+    } catch {
+      // Visual full-screen workspace (isModuleFullScreen) still works inside restricted iframes
+    }
+  };
+
+  // Auto-save Admin Profile Changes silently when edited or when closing modal with Cross (✕)
+  const autoSaveAdminProfileSilently = useCallback(async () => {
+    const nextName = adminAccountForm.adminFullName.trim() || 'Hospital Administrator';
+    const nextEmail = adminAccountForm.adminEmail.trim() || 'admin@hospital.local';
+    const nextUser = adminAccountForm.adminUsername.trim() || 'admin';
+    const hasChanged =
+      nextName !== (settings.adminFullName || 'Hospital Administrator') ||
+      nextEmail !== (settings.adminEmail || 'admin@hospital.local') ||
+      nextUser !== (settings.adminUsername || 'admin') ||
+      Boolean(adminAccountForm.adminPassword.trim());
+
+    if (!hasChanged) {
+      setLastAutoSavedTime(new Date().toLocaleTimeString());
+      return;
+    }
+
+    try {
+      const payload: Record<string, any> = {
+        adminFullName: nextName,
+        adminEmail: nextEmail,
+        adminUsername: nextUser,
+      };
+      if (adminAccountForm.adminPassword.trim()) {
+        payload.adminPassword = adminAccountForm.adminPassword.trim();
+      }
+      const headers = await buildHeaders();
+      await fetch('/api/settings', {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(payload),
+      });
+      setSettings((prev) => ({
+        ...prev,
+        adminFullName: nextName,
+        adminEmail: nextEmail,
+        adminUsername: nextUser,
+      }));
+      setLoggedInStaffName(nextName);
+      setLoggedInStaffEmail(nextEmail);
+      setLastAutoSavedTime(new Date().toLocaleTimeString());
+    } catch {
+      // Silent background auto-save
+    }
+  }, [adminAccountForm, settings, buildHeaders]);
+
+  // Debounced real-time auto-save while typing inside Customize Admin ID modal
+  useEffect(() => {
+    if (!showAdminAccountModal && !(isLocked && loginMode === 'CREATE_ADMIN')) return;
+    const timer = setTimeout(() => {
+      autoSaveAdminProfileSilently();
+    }, 700);
+    return () => clearTimeout(timer);
+  }, [
+    adminAccountForm.adminFullName,
+    adminAccountForm.adminEmail,
+    adminAccountForm.adminUsername,
+    adminAccountForm.adminPassword,
+    showAdminAccountModal,
+    isLocked,
+    loginMode,
+    autoSaveAdminProfileSilently,
+  ]);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -493,12 +888,12 @@ export default function App() {
     }
   };
 
-  // Pharmacy POS & Inventory Handlers
+  // Pharmacy POS & Inventory Handlers (Hospital Retail Only)
   const handleCheckoutPos = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const res = await postMutation('/api/pharmacy/pos', {
-        saleType: posSaleType,
+        saleType: 'RETAIL',
         customerName: posCustomerName,
         items: posCart,
         discount: 0,
@@ -508,7 +903,7 @@ export default function App() {
       });
       notify(
         'success',
-        `Pharmacy ${posSaleType} Sale ${res.invoice.invoiceNo} completed (${res.invoice.netTotal.toLocaleString()} ${settings.currency}).`
+        `Pharmacy Retail Sale ${res.invoice.invoiceNo} completed (${res.invoice.netTotal.toLocaleString()} ${settings.currency}). Stock deducted & Profit updated.`
       );
       setPrintableDoc({ type: 'INVOICE', data: res.invoice });
     } catch (err: any) {
@@ -522,10 +917,302 @@ export default function App() {
       const res = await postMutation('/api/pharmacy/purchase', grnForm);
       notify(
         'success',
-        `GRN Received: ${res.batch.brandName} [Batch ${res.batch.batchNo}] capitalized to Inventory Asset.`
+        `Medicine Added: ${grnForm.qty} units of ${res.batch.brandName} [Batch ${res.batch.batchNo}] added to stock. Total Bill: ${(grnForm.qty * grnForm.unitCost).toLocaleString()} ${settings.currency}.`
       );
     } catch (err: any) {
       notify('error', err.message);
+    }
+  };
+
+  const handlePaySupplierBill = async (bill: SupplierBill) => {
+    if (bill.remainingAmount <= 0) return;
+    try {
+      const res = await postMutation(`/api/pharmacy/supplier-bills/${bill.id}/pay`, {
+        amount: bill.remainingAmount,
+      });
+      notify(
+        'success',
+        `Paid remaining balance on Supplier Bill ${res.supplierBill.billNo} (${res.supplierBill.supplierName}).`
+      );
+    } catch (err: any) {
+      notify('error', err.message);
+    }
+  };
+
+  const handleCreateCustomerBill = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const res = await postMutation('/api/billing/create-invoice', customerBillForm);
+      notify(
+        'success',
+        `Customer Bill ${res.invoice.invoiceNo} created for ${res.invoice.customerName} (${res.invoice.netTotal.toLocaleString()} ${settings.currency}).`
+      );
+      setPrintableDoc({ type: 'INVOICE', data: res.invoice });
+    } catch (err: any) {
+      notify('error', err.message);
+    }
+  };
+
+  const handleAddStaffMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const chosenDesignation =
+      staffDesignationPreset === 'OTHER_CUSTOM'
+        ? customStaffDesignation.trim() || 'General Hospital Staff'
+        : staffDesignationPreset;
+    try {
+      const res = await postMutation('/api/hr/employees', {
+        ...newStaffForm,
+        designation: chosenDesignation,
+      });
+      setNewStaffForm({ ...newStaffForm, fullName: '' });
+      setCustomStaffDesignation('');
+      notify(
+        'success',
+        `Added staff member ${res.employee.fullName} (${res.employee.designation}) — Net Salary: ${res.employee.netSalary.toLocaleString()} ${settings.currency}.`
+      );
+    } catch (err: any) {
+      notify('error', err.message);
+    }
+  };
+
+  const handlePayIndividualSalary = async (emp: Employee) => {
+    try {
+      const res = await postMutation('/api/hr/pay-salary', {
+        employeeId: emp.id,
+        payrollMonth,
+        amount: emp.netSalary,
+        businessDate: '2026-10-10',
+        paymentDate: '2026-10-10',
+      });
+      notify(
+        'success',
+        `Salary of ${res.slip.netPaid.toLocaleString()} ${settings.currency} paid to ${emp.fullName} & deducted from Hospital Profit/Loss.`
+      );
+      setPrintableDoc({ type: 'SALARY_SLIP', data: res.slip });
+    } catch (err: any) {
+      notify('error', err.message);
+    }
+  };
+
+  const handleRestoreLaptopFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      await postMutation('/api/backups/restore-laptop', parsed);
+      notify('success', `Successfully restored Hospital ERP database from laptop backup file (${file.name}).`);
+    } catch (err: any) {
+      notify('error', err.message || 'Invalid backup file.');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  // Link a Laptop Folder for Direct Browser Auto-Save (in addition to Server Disk Auto-Save)
+  const handleLinkLaptopFolder = async () => {
+    try {
+      const anyWin = window as any;
+      if (typeof anyWin.showDirectoryPicker === 'function') {
+        const handle = await anyWin.showDirectoryPicker({ mode: 'readwrite' });
+        setLaptopDirHandle(handle);
+        setLaptopFolderName(`Laptop Folder: ${handle.name} (Live Auto-Sync Active)`);
+        notify(
+          'success',
+          `Linked Laptop folder "${handle.name}" — Backups & History will now auto-save directly to this folder on every transaction.`
+        );
+        await fetchBootstrap();
+      } else {
+        notify(
+          'success',
+          'Automatic server-side file backup is active in data/Laptop_Auto_Backups/ (JSON + Excel CSV updated after every transaction).'
+        );
+      }
+    } catch {
+      // User cancelled folder picker
+    }
+  };
+
+  // Customer Medicine Return (Restores Stock + Reverses Revenue & COGS in Profit & Loss)
+  const handleReturnPharmacySale = async (
+    inv: Invoice,
+    itemIndex?: number,
+    returnQty?: number
+  ) => {
+    try {
+      const res = await postMutation('/api/pharmacy/return-sale', {
+        invoiceId: inv.id,
+        itemIndex,
+        returnQty,
+        reason: 'Customer returned medicine to pharmacy counter',
+      });
+      notify(
+        'success',
+        `Medicine Return Processed on ${res.invoice.invoiceNo}: Returned medicine added back to Pharmacy Stock & Profit/Loss updated automatically.`
+      );
+    } catch (err: any) {
+      notify('error', err.message);
+    }
+  };
+
+  // Universal Delete Handler for Mistaken Entries (Updates Stock, Ledgers & P&L Immediately)
+  const handleDeleteRecord = async (
+    entityType:
+      | 'patient'
+      | 'encounter'
+      | 'lab-order'
+      | 'pharmacy-batch'
+      | 'supplier-bill'
+      | 'invoice'
+      | 'employee'
+      | 'salary-slip'
+      | 'expense'
+      | 'journal-entry',
+    id: string,
+    label: string
+  ) => {
+    try {
+      const headers = await buildHeaders();
+      const res = await fetch(`/api/records/${entityType}/${id}`, {
+        method: 'DELETE',
+        headers,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete record');
+      }
+      await fetchBootstrap();
+      notify('success', data.summary || `Deleted ${label} & updated records.`);
+    } catch (err: any) {
+      notify('error', err.message);
+    }
+  };
+
+  const handleUnlockSession = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loginMode === 'CREATE_ADMIN') {
+      const currentPin = settings.securityPin || securityPin || '1234';
+      const currentPass = settings.adminPassword || 'admin123';
+      if (
+        adminAccountForm.currentPinOrPassword &&
+        adminAccountForm.currentPinOrPassword !== currentPin &&
+        adminAccountForm.currentPinOrPassword !== currentPass
+      ) {
+        setLoginError('Current PIN or Password is incorrect.');
+        return;
+      }
+      try {
+        const nextName = adminAccountForm.adminFullName.trim() || 'Hospital Administrator';
+        const nextEmail = adminAccountForm.adminEmail.trim() || 'admin@hospital.local';
+        const nextUser = adminAccountForm.adminUsername.trim() || 'admin';
+        const payload: Record<string, any> = {
+          adminFullName: nextName,
+          adminEmail: nextEmail,
+          adminUsername: nextUser,
+        };
+        if (adminAccountForm.adminPassword.trim()) {
+          payload.adminPassword = adminAccountForm.adminPassword.trim();
+        }
+        await postMutation('/api/settings', payload, 'PATCH');
+        setLoggedInStaffName(nextName);
+        setLoggedInStaffEmail(nextEmail);
+        setIsLocked(false);
+        setLoginError('');
+        notify('success', `Admin ID saved & logged in as ${nextName} (${nextEmail}).`);
+      } catch (err: any) {
+        setLoginError(err.message || 'Could not save Admin account.');
+      }
+      return;
+    }
+
+    if (loginMode === 'PIN') {
+      if (pinInput === (settings.securityPin || securityPin)) {
+        setIsLocked(false);
+        setPinInput('');
+        setLoginError('');
+        notify('success', `Unlocked session as ${loggedInStaffName}.`);
+      } else {
+        setLoginError('Incorrect Security PIN. Please enter your valid PIN.');
+      }
+    } else {
+      const configuredUser = (settings.adminUsername || 'admin').toLowerCase();
+      const configuredEmail = (settings.adminEmail || 'admin@hospital.local').toLowerCase();
+      const configuredPass = settings.adminPassword || 'admin123';
+      const enteredUser = usernameInput.trim().toLowerCase();
+      if (
+        (enteredUser === configuredUser || enteredUser === configuredEmail || enteredUser === 'admin') &&
+        (passwordInput === configuredPass || passwordInput === (settings.securityPin || securityPin))
+      ) {
+        setIsLocked(false);
+        setPasswordInput('');
+        setLoginError('');
+        notify('success', `Logged in as ${settings.adminFullName || loggedInStaffName}.`);
+      } else {
+        setLoginError('Invalid Username/Email or Password.');
+      }
+    }
+  };
+
+  const handleSaveCustomAdminAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const nextName = adminAccountForm.adminFullName.trim() || 'Hospital Administrator';
+      const nextEmail = adminAccountForm.adminEmail.trim() || 'admin@hospital.local';
+      const nextUser = adminAccountForm.adminUsername.trim() || 'admin';
+      const payload: Record<string, any> = {
+        adminFullName: nextName,
+        adminEmail: nextEmail,
+        adminUsername: nextUser,
+      };
+      if (adminAccountForm.adminPassword.trim()) {
+        payload.adminPassword = adminAccountForm.adminPassword.trim();
+      }
+      await postMutation('/api/settings', payload, 'PATCH');
+      setLoggedInStaffName(nextName);
+      setLoggedInStaffEmail(nextEmail);
+      setShowAdminAccountModal(false);
+      setAdminAccountForm((prev) => ({ ...prev, adminPassword: '', currentPinOrPassword: '' }));
+      notify(
+        'success',
+        `Admin Profile customized: ${nextName} (${nextEmail} · Login ID: ${nextUser}).`
+      );
+    } catch (err: any) {
+      notify('error', err.message || 'Failed to update Admin account');
+    }
+  };
+
+  const handleSaveNewSecurityPin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPinModalError('');
+    const activePin = settings.securityPin || securityPin || '1234';
+    const activePass = settings.adminPassword || 'admin123';
+    if (oldPinInput !== activePin && oldPinInput !== activePass) {
+      setPinModalError('Incorrect Current (Old) PIN! You must enter the valid old PIN first.');
+      return;
+    }
+    if (newPinInput.length < 4) {
+      setPinModalError('New PIN must be at least 4 digits.');
+      return;
+    }
+    if (newPinInput !== confirmNewPinInput) {
+      setPinModalError('New PIN and Confirm New PIN do not match.');
+      return;
+    }
+    try {
+      await postMutation(
+        '/api/settings',
+        { oldPin: oldPinInput, securityPin: newPinInput },
+        'PATCH'
+      );
+      setSecurityPin(newPinInput);
+      setOldPinInput('');
+      setNewPinInput('');
+      setConfirmNewPinInput('');
+      setPinModalError('');
+      setShowChangePinModal(false);
+      notify('success', 'Security PIN updated after verifying old PIN.');
+    } catch (err: any) {
+      setPinModalError(err.message || 'Could not update PIN');
     }
   };
 
@@ -647,365 +1334,1217 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#F8FAFC] text-slate-900">
-      {/* STRICT 3-ZONE TOP BAR CONTRACT */}
-      <header className="flex items-center justify-between gap-8 px-6 py-3.5 bg-white border-b border-slate-200 sticky top-0 z-30">
-        {/* Zone 1: Single text element wordmark */}
-        <a
-          href="#top"
-          onClick={(e) => {
-            e.preventDefault();
-            setActiveModule('home');
-          }}
-          className="text-base font-bold tracking-tight text-slate-900 whitespace-nowrap shrink-0"
-        >
-          {settings.hospitalName} ERP
-        </a>
-
-        {/* Zone 2: 5 concise single-line navigation links */}
-        <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
-          <button
-            type="button"
-            onClick={() => setActiveModule('home')}
-            className={`hover:text-slate-900 transition-colors whitespace-nowrap shrink-0 cursor-pointer pb-0.5 ${
-              activeModule === 'home'
-                ? 'text-teal-700 border-b-2 border-teal-600 font-semibold'
-                : ''
-            }`}
-          >
-            Home & P&L
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveModule('clinical')}
-            className={`hover:text-slate-900 transition-colors whitespace-nowrap shrink-0 cursor-pointer pb-0.5 ${
-              activeModule === 'clinical'
-                ? 'text-slate-900 border-b-2 border-slate-900 font-semibold'
-                : ''
-            }`}
-          >
-            Clinical & IPD
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveModule('laboratory')}
-            className={`hover:text-slate-900 transition-colors whitespace-nowrap shrink-0 cursor-pointer pb-0.5 ${
-              activeModule === 'laboratory'
-                ? 'text-slate-900 border-b-2 border-slate-900 font-semibold'
-                : ''
-            }`}
-          >
-            Laboratory
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveModule('pharmacy')}
-            className={`hover:text-slate-900 transition-colors whitespace-nowrap shrink-0 cursor-pointer pb-0.5 ${
-              activeModule === 'pharmacy'
-                ? 'text-slate-900 border-b-2 border-slate-900 font-semibold'
-                : ''
-            }`}
-          >
-            Pharmacy POS
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              setActiveModule(
-                activeModule === 'billing_hr' ? 'accounting_security' : 'billing_hr'
-              )
-            }
-            className={`hover:text-slate-900 transition-colors whitespace-nowrap shrink-0 cursor-pointer pb-0.5 ${
-              activeModule === 'billing_hr' || activeModule === 'accounting_security'
-                ? 'text-slate-900 border-b-2 border-slate-900 font-semibold'
-                : ''
-            }`}
-          >
-            Finance, HR & Go-Live
-          </button>
-        </nav>
-
-        {/* Zone 3: 1 primary action */}
-        <div className="flex items-center gap-3 shrink-0">
-          {user ? (
-            <button
-              type="button"
-              onClick={() => signOut(auth)}
-              className="px-4 py-2 text-xs font-medium text-white bg-slate-900 rounded-md hover:bg-slate-800 transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5 cursor-pointer"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Sign Out ({user.email?.split('@')[0]})</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleGoogleSignIn}
-              className="px-4 py-2 text-xs font-medium text-white bg-slate-900 rounded-md hover:bg-slate-800 transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5 cursor-pointer"
-            >
-              <LogIn className="w-3.5 h-3.5" />
-              <span>Staff Cloud Sign-In</span>
-            </button>
+    <div
+      className={`h-screen w-screen overflow-hidden flex bg-[#EEF3F6] text-slate-900 ${
+        isModuleFullScreen || isAppFullScreen ? 'fixed inset-0 z-40' : ''
+      }`}
+    >
+      {/* =====================================================================
+          MINIMIZED OPTIONS / MODULES LAPTOP TASKBAR BAR (BOTTOM LEFT)
+         ===================================================================== */}
+      {(minimizedModules.length > 0 || isAppMinimized) && (
+        <div className="fixed bottom-4 left-4 z-50 flex flex-wrap items-center gap-2 max-w-xl">
+          {isAppMinimized && (
+            <div className="bg-[#1D5464] text-white rounded-xl shadow-2xl border border-white/20 px-3 py-1.5 flex items-center gap-2 text-xs">
+              <span className="font-semibold truncate max-w-[180px]">
+                {getModuleMeta(activeModule).label}
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsAppMinimized(false)}
+                className="h-6 w-6 rounded bg-white/15 hover:bg-white/25 text-white inline-flex items-center justify-center cursor-pointer"
+                title="Restore Window"
+              >
+                <Maximize2 className="w-3 h-3" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsAppMinimized(false)}
+                className="h-6 w-6 rounded bg-rose-600 hover:bg-rose-700 text-white inline-flex items-center justify-center cursor-pointer"
+                title="Close (✕)"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
           )}
+          {minimizedModules.map((mod) => {
+            const meta = getModuleMeta(mod);
+            return (
+              <div
+                key={mod}
+                className="bg-[#1D5464] text-white rounded-xl shadow-2xl border border-white/20 px-3 py-1.5 flex items-center gap-2 text-xs"
+              >
+                <span className="font-semibold truncate max-w-[180px]">
+                  {meta.label}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAppMinimized(false);
+                    navigateToOption(mod);
+                  }}
+                  className="h-6 w-6 rounded bg-white/15 hover:bg-white/25 text-white inline-flex items-center justify-center cursor-pointer"
+                  title="Restore Window"
+                >
+                  <Maximize2 className="w-3 h-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setMinimizedModules((prev) => prev.filter((item) => item !== mod))
+                  }
+                  className="h-6 w-6 rounded bg-rose-600 hover:bg-rose-700 text-white inline-flex items-center justify-center cursor-pointer"
+                  title="Close (✕)"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            );
+          })}
         </div>
-      </header>
+      )}
 
-      {/* WORKSPACE CONTROL BAR (Client Mode, LAN Offline Simulation, RBAC Role, Attribution) */}
-      <div className="bg-slate-900 text-slate-200 px-6 py-2.5 border-b border-slate-800 text-xs">
-        <div className="max-w-[1440px] mx-auto flex flex-wrap items-center justify-between gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="font-semibold text-white">
-              Developed by Sajjad Qaiser Shah
-            </span>
-            <span aria-hidden="true" className="text-slate-600">·</span>
-            <span className="font-mono text-slate-300">
-              Central DB: {settings.dbBindAddress}
-            </span>
-            <span aria-hidden="true" className="text-slate-600">·</span>
-            <button
-              type="button"
-              onClick={handleToggleOfflineMode}
-              className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                settings.simulatedInternetOffline
-                  ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                  : 'bg-slate-800 text-emerald-300 border border-slate-700 hover:bg-slate-700'
-              }`}
-            >
-              {settings.simulatedInternetOffline ? (
-                <>
-                  <WifiOff className="w-3.5 h-3.5" />
-                  <span>Internet Disconnected (LAN-Only Mode Active)</span>
-                </>
-              ) : (
-                <>
-                  <Wifi className="w-3.5 h-3.5" />
-                  <span>LAN + Internet Connected (Click to Test Offline LAN)</span>
-                </>
-              )}
-            </button>
-          </div>
+      {/* =====================================================================
+          LOGIN / LOGOUT OVERLAY (WITH LAPTOP ← BACK, —, □, ✕)
+         ===================================================================== */}
+      {isLocked && isLockModalMinimized && (
+        <div className="fixed bottom-4 right-4 z-50 bg-[#1D5464] text-white rounded-xl shadow-2xl border border-white/20 px-3.5 py-2 flex items-center gap-2.5 text-xs">
+          <KeyRound className="w-4 h-4 text-teal-200 shrink-0" />
+          <span className="font-semibold whitespace-nowrap">
+            Login / Logout (PIN)
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setIsLockModalMinimized(false);
+              setIsLockModalFullScreen(false);
+            }}
+            className="h-7 w-7 rounded bg-white/15 hover:bg-white/25 text-white inline-flex items-center justify-center cursor-pointer"
+            title="Restore Window"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              await autoSaveAdminProfileSilently();
+              setIsLocked(false);
+              setIsLockModalMinimized(false);
+              setIsLockModalFullScreen(false);
+            }}
+            className="h-7 w-7 rounded bg-rose-600 hover:bg-rose-700 text-white inline-flex items-center justify-center cursor-pointer"
+            title="Close (✕)"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
-          <div className="flex flex-wrap items-center gap-4">
-            {/* Client Form Factor Selector */}
-            <div className="flex items-center gap-1 bg-slate-800 p-0.5 rounded-md">
+      {isLocked && !isLockModalMinimized && (
+        <div className="fixed inset-0 z-50 bg-[#0F2937]/95 flex flex-col overflow-hidden">
+          {/* Top-Most Laptop Window Bar for Login / Logout Screen */}
+          <div className="bg-slate-100 border-b border-slate-300 px-6 py-2 shrink-0 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
               <button
                 type="button"
-                onClick={() => setClientMode('LAN_WEB')}
-                className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                  clientMode === 'LAN_WEB'
-                    ? 'bg-white text-slate-900'
-                    : 'text-slate-300 hover:text-white'
-                }`}
+                onClick={async () => {
+                  await autoSaveAdminProfileSilently();
+                  setIsLocked(false);
+                  setIsLockModalMinimized(false);
+                  setIsLockModalFullScreen(false);
+                }}
+                className="h-8 w-8 rounded-md bg-white hover:bg-slate-200 border border-slate-300 text-slate-800 inline-flex items-center justify-center cursor-pointer transition-colors"
+                title="Back (←)"
               >
-                <Globe className="w-3 h-3" />
-                <span>LAN Web</span>
+                <ArrowLeft className="w-4 h-4" />
               </button>
-              <button
-                type="button"
-                onClick={() => setClientMode('WINDOWS_DESKTOP')}
-                className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                  clientMode === 'WINDOWS_DESKTOP'
-                    ? 'bg-white text-slate-900'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                <Monitor className="w-3 h-3" />
-                <span>Windows App</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setClientMode('MOBILE_LAN')}
-                className={`px-2.5 py-1 rounded text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer whitespace-nowrap shrink-0 ${
-                  clientMode === 'MOBILE_LAN'
-                    ? 'bg-white text-slate-900'
-                    : 'text-slate-300 hover:text-white'
-                }`}
-              >
-                <Smartphone className="w-3 h-3" />
-                <span>Mobile Wi-Fi</span>
-              </button>
-            </div>
-
-            {/* Staff Role RBAC Selector */}
-            <div className="flex items-center gap-2">
-              <span className="text-slate-400">Active Role:</span>
-              <select
-                value={activeRole}
-                onChange={(e) => setActiveRole(e.target.value as StaffRole)}
-                className="bg-slate-800 border border-slate-700 text-white rounded px-2 py-1 text-xs font-mono"
-              >
-                <option value="ADMIN">ADMIN (Full Access)</option>
-                <option value="DOCTOR">DOCTOR (Clinical/Lab)</option>
-                <option value="LAB_TECH">LAB_TECH (Pathology)</option>
-                <option value="PHARMACIST">PHARMACIST (POS/Stock)</option>
-                <option value="CASHIER">CASHIER (Billing)</option>
-                <option value="ACCOUNTANT">ACCOUNTANT (Ledger/P&L)</option>
-                <option value="HR_MANAGER">HR_MANAGER (Payroll)</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Organized Module Bar (Visible across all screens for instant 1-click switching) */}
-      <div className="flex items-center gap-2 overflow-x-auto px-4 sm:px-6 py-2 bg-white border-b border-slate-200">
-        <div className="max-w-[1440px] mx-auto w-full flex items-center gap-2">
-          {(
-            [
-              ['home', 'Home & P&L Graphs (ہوم پیج)'],
-              ['clinical', 'Clinical & IPD Registry'],
-              ['laboratory', 'Laboratory & Barcodes'],
-              ['pharmacy', 'Pharmacy POS & Stock'],
-              ['billing_hr', 'Billing, Expenses & HR'],
-              ['accounting_security', 'Double-Entry P&L & Go-Live'],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setActiveModule(key)}
-              className={`px-3 py-1.5 text-xs font-medium rounded-md whitespace-nowrap shrink-0 cursor-pointer transition-colors ${
-                activeModule === key
-                  ? key === 'home'
-                    ? 'bg-teal-600 text-white font-semibold'
-                    : 'bg-slate-900 text-white font-semibold'
-                  : 'text-slate-600 bg-slate-100 hover:bg-slate-200'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Main Content Container (Adapts for LAN Web, Windows Desktop Wrapper, or Mobile Ward Client) */}
-      <div
-        className={`flex-1 mx-auto w-full transition-all ${
-          clientMode === 'MOBILE_LAN'
-            ? 'max-w-md border-x border-slate-300 bg-white shadow-sm my-4 rounded-xl overflow-hidden'
-            : 'max-w-[1440px] px-4 sm:px-6 py-6'
-        }`}
-      >
-        {/* Windows Desktop Client Titlebar Banner when in WINDOWS_DESKTOP mode */}
-        {clientMode === 'WINDOWS_DESKTOP' && (
-          <div className="mb-5 bg-slate-800 text-white px-4 py-2.5 rounded-t-lg flex items-center justify-between text-xs font-mono">
-            <div className="flex items-center gap-2">
-              <Monitor className="w-4 h-4 text-sky-400" />
-              <span>
-                HospitalERP-Win64-Workstation.exe · Secure WebView2 Kiosk · Connected to 192.168.10.10:3000
+              <span className="text-xs sm:text-sm font-bold text-slate-900">
+                Login / Logout — {settings.hospitalName}
               </span>
             </div>
-            <div>USB Barcode HID: READY · Thermal Printer: COM1 · Developed by Sajjad Qaiser Shah</div>
-          </div>
-        )}
-
-        {/* Mobile Ward Wi-Fi Header when in MOBILE_LAN mode */}
-        {clientMode === 'MOBILE_LAN' && (
-          <div className="bg-slate-900 text-white px-4 py-3 text-xs flex items-center justify-between">
-            <div>
-              <div className="font-bold">Hospital Ward Mobile Client</div>
-              <div className="text-[11px] text-slate-300">
-                Wi-Fi VLAN 192.168.20.0/24 · Developed by Sajjad Qaiser Shah
-              </div>
-            </div>
-            <span className="font-mono text-[11px] text-emerald-400">LAN SYNC</span>
-          </div>
-        )}
-
-        <div className={clientMode === 'MOBILE_LAN' ? 'p-4 space-y-6' : 'space-y-6'}>
-          {/* Notification Banner */}
-          {statusBanner && (
-            <div
-              className={`px-4 py-3 rounded-md border text-xs flex items-center justify-between ${
-                statusBanner.kind === 'success'
-                  ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
-                  : 'bg-red-50 border-red-200 text-red-900'
-              }`}
-            >
-              <div className="flex items-center gap-2 font-medium">
-                {statusBanner.kind === 'success' ? (
-                  <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
-                ) : (
-                  <AlertTriangle className="w-4 h-4 text-red-700 shrink-0" />
-                )}
-                <span>{statusBanner.text}</span>
-              </div>
+            <div className="flex items-center gap-1.5">
               <button
                 type="button"
-                onClick={() => setStatusBanner(null)}
-                className="text-xs underline ml-4 cursor-pointer"
+                onClick={async () => {
+                  await autoSaveAdminProfileSilently();
+                  setIsLockModalMinimized(true);
+                }}
+                className="h-8 w-8 rounded-md bg-white hover:bg-slate-200 border border-slate-300 text-slate-700 inline-flex items-center justify-center cursor-pointer transition-colors"
+                title="Minimize (—)"
               >
-                Dismiss
+                <Minus className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLockModalFullScreen((prev) => !prev);
+                  toggleBrowserFullScreen();
+                }}
+                className="h-8 w-8 rounded-md bg-white hover:bg-slate-200 border border-slate-300 text-slate-700 inline-flex items-center justify-center cursor-pointer transition-colors"
+                title={isLockModalFullScreen ? 'Restore Down' : 'Maximize / Full Screen'}
+              >
+                {isLockModalFullScreen ? (
+                  <Minimize2 className="w-3.5 h-3.5" />
+                ) : (
+                  <Maximize2 className="w-3.5 h-3.5" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  await autoSaveAdminProfileSilently();
+                  setIsLocked(false);
+                  setIsLockModalMinimized(false);
+                  setIsLockModalFullScreen(false);
+                }}
+                className="h-8 w-8 rounded-md bg-rose-600 hover:bg-rose-700 text-white inline-flex items-center justify-center cursor-pointer transition-colors"
+                title="Close (✕)"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
-          )}
+          </div>
 
-          {/* Top Executive KPI Strip (Tabular Numerals, Unboxed Metadata) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white border border-slate-200 rounded-lg p-4">
-              <div className="text-xs text-slate-500">
-                Registered Patients · Active OPD/IPD
+          <div
+            className={`flex-1 overflow-y-auto flex items-center justify-center ${
+              isLockModalFullScreen ? 'p-0' : 'p-4'
+            }`}
+          >
+            <div
+              className={`bg-white shadow-2xl border border-slate-200 w-full space-y-4 ${
+                isLockModalFullScreen
+                  ? 'w-full min-h-full max-w-none rounded-none p-6 md:p-12 flex flex-col justify-center'
+                  : 'rounded-2xl max-w-lg p-6 my-auto'
+              }`}
+            >
+              {/* Laptop Window Bar inside Login / Logout Box */}
+              <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-200">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await autoSaveAdminProfileSilently();
+                      setIsLocked(false);
+                      setIsLockModalMinimized(false);
+                      setIsLockModalFullScreen(false);
+                    }}
+                    className="h-8 w-8 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 inline-flex items-center justify-center cursor-pointer transition-colors"
+                    title="Back (←)"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-xs font-bold text-slate-800">
+                    Login / Logout (Security PIN &amp; Staff Login)
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await autoSaveAdminProfileSilently();
+                      setIsLockModalMinimized(true);
+                    }}
+                    className="h-8 w-8 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 inline-flex items-center justify-center cursor-pointer transition-colors"
+                    title="Minimize (—)"
+                  >
+                    <Minus className="w-4 h-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsLockModalFullScreen((prev) => !prev)}
+                    className="h-8 w-8 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 inline-flex items-center justify-center cursor-pointer transition-colors"
+                    title={isLockModalFullScreen ? 'Restore Down' : 'Maximize / Full Screen'}
+                  >
+                    {isLockModalFullScreen ? (
+                      <Minimize2 className="w-3.5 h-3.5" />
+                    ) : (
+                      <Maximize2 className="w-3.5 h-3.5" />
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      await autoSaveAdminProfileSilently();
+                      setIsLocked(false);
+                      setIsLockModalMinimized(false);
+                      setIsLockModalFullScreen(false);
+                    }}
+                    className="h-8 w-8 rounded-md bg-rose-600 hover:bg-rose-700 text-white inline-flex items-center justify-center cursor-pointer transition-colors"
+                    title="Close (✕)"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
-              <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 mt-1">
-                {patients.length} Patients · {encounters.length} Visits
+
+              <div className="text-center space-y-1">
+                <div className="w-11 h-11 rounded-xl bg-[#1D5464] text-white flex items-center justify-center mx-auto">
+                  <KeyRound className="w-5 h-5" />
+                </div>
+                <h2 className="text-lg font-bold text-slate-900">
+                  {settings.hospitalName}
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Enter Security PIN or Staff Login to Access System
+                </p>
               </div>
-              <div className="text-xs text-slate-500 mt-1.5">
-                IPD Admitted: {encounters.filter((e) => e.status === 'ADMITTED').length} · Doctors On Duty: {doctors.filter((d) => d.onDuty).length}
-              </div>
+
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-lg text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginMode('PIN');
+                  setLoginError('');
+                }}
+                className={`flex-1 py-2 rounded-md font-bold cursor-pointer ${
+                  loginMode === 'PIN'
+                    ? 'bg-[#1D5464] text-white'
+                    : 'text-slate-600'
+                }`}
+              >
+                Security PIN
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginMode('PASSWORD');
+                  setLoginError('');
+                }}
+                className={`flex-1 py-2 rounded-md font-bold cursor-pointer ${
+                  loginMode === 'PASSWORD'
+                    ? 'bg-[#1D5464] text-white'
+                    : 'text-slate-600'
+                }`}
+              >
+                Admin ID &amp; Password
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoginMode('CREATE_ADMIN');
+                  setLoginError('');
+                }}
+                className={`flex-1 py-2 rounded-md font-bold cursor-pointer ${
+                  loginMode === 'CREATE_ADMIN'
+                    ? 'bg-[#1D5464] text-white'
+                    : 'text-slate-600'
+                }`}
+              >
+                Setup Admin ID
+              </button>
             </div>
 
-            <div className="bg-white border border-slate-200 rounded-lg p-4">
-              <div className="text-xs text-slate-500">
-                Laboratory Barcode Orders
+            <form onSubmit={handleUnlockSession} className="space-y-4 text-xs">
+              {loginMode !== 'CREATE_ADMIN' && (
+                <div>
+                  <label className="block text-slate-600 mb-1 font-medium">
+                    Select Staff Profile / Role
+                  </label>
+                  <select
+                    value={activeRole}
+                    onChange={(e) => {
+                      const nextRole = e.target.value as StaffRole;
+                      setActiveRole(nextRole);
+                      setLoggedInStaffName(
+                        nextRole === 'ADMIN'
+                          ? settings.adminFullName || 'Hospital Administrator'
+                          : nextRole === 'PHARMACIST'
+                          ? 'Chief Pharmacist'
+                          : nextRole === 'CASHIER'
+                          ? 'Billing Cashier'
+                          : nextRole === 'LAB_TECH'
+                          ? 'Pathology Lab Officer'
+                          : nextRole === 'COOK'
+                          ? 'Kitchen / Cook Staff'
+                          : nextRole === 'SWEEPER'
+                          ? 'Sanitation / Sweeper Staff'
+                          : 'Hospital Staff'
+                      );
+                    }}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white text-slate-900 font-semibold"
+                  >
+                    <option value="ADMIN">
+                      {settings.adminFullName || 'Administrator'} (Full Access)
+                    </option>
+                    <option value="PHARMACIST">Pharmacist (Pharmacy &amp; Stock)</option>
+                    <option value="CASHIER">Cashier (Customer Billing &amp; Receipts)</option>
+                    <option value="LAB_TECH">Laboratory Technologist / Assistant</option>
+                    <option value="ACCOUNTANT">Accountant (Profit/Loss &amp; Salary)</option>
+                    <option value="DOCTOR">Physician / Doctor</option>
+                    <option value="NURSE">Staff Nurse</option>
+                    <option value="RECEPTIONIST">Receptionist</option>
+                    <option value="COOK">Cook / Kitchen Staff</option>
+                    <option value="SWEEPER">Cleaner / Sweeper Staff</option>
+                    <option value="OTHER">Other / Custom Hospital Staff</option>
+                  </select>
+                </div>
+              )}
+
+              {loginMode === 'PIN' ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-slate-600 mb-1 font-medium">
+                      Enter Secret Security PIN
+                    </label>
+                    <input
+                      type="password"
+                      maxLength={6}
+                      value={pinInput}
+                      onChange={(e) => setPinInput(e.target.value)}
+                      placeholder="••••"
+                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg text-center font-mono text-xl tracking-widest text-slate-900"
+                    />
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {['1', '2', '3', '4', '5', '6', '7', '8', '9', 'Clear', '0', 'Enter'].map(
+                      (k) => (
+                        <button
+                          key={k}
+                          type={k === 'Enter' ? 'submit' : 'button'}
+                          onClick={() => {
+                            if (k === 'Clear') setPinInput('');
+                            else if (k !== 'Enter') setPinInput((p) => (p + k).slice(0, 6));
+                          }}
+                          className={`py-2.5 rounded-lg font-mono font-bold text-sm cursor-pointer border ${
+                            k === 'Enter'
+                              ? 'bg-emerald-600 text-white border-emerald-600'
+                              : k === 'Clear'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200'
+                              : 'bg-slate-50 hover:bg-slate-100 text-slate-900 border-slate-200'
+                          }`}
+                        >
+                          {k}
+                        </button>
+                      )
+                    )}
+                  </div>
+                </div>
+              ) : loginMode === 'PASSWORD' ? (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-slate-600 mb-1 font-medium">
+                      Admin Username or Email ID
+                    </label>
+                    <input
+                      type="text"
+                      value={usernameInput}
+                      onChange={(e) => setUsernameInput(e.target.value)}
+                      placeholder="Enter your Admin Username or Email..."
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 mb-1 font-medium">
+                      Password
+                    </label>
+                    <input
+                      type="password"
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      placeholder="••••••••"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-slate-900"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  <div>
+                    <label className="block text-slate-600 mb-1 font-medium">
+                      Your Full Name (Admin Name)
+                    </label>
+                    <input
+                      type="text"
+                      value={adminAccountForm.adminFullName}
+                      onChange={(e) =>
+                        setAdminAccountForm({
+                          ...adminAccountForm,
+                          adminFullName: e.target.value,
+                        })
+                      }
+                      placeholder="e.g., Dr. Ahmed / Hospital Admin"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-slate-600 mb-1 font-medium">
+                      Your Email / Official ID
+                    </label>
+                    <input
+                      type="text"
+                      value={adminAccountForm.adminEmail}
+                      onChange={(e) =>
+                        setAdminAccountForm({
+                          ...adminAccountForm,
+                          adminEmail: e.target.value,
+                        })
+                      }
+                      placeholder="e.g., admin@hospital.com"
+                      className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-slate-900"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-slate-600 mb-1 font-medium">
+                        Login Username
+                      </label>
+                      <input
+                        type="text"
+                        value={adminAccountForm.adminUsername}
+                        onChange={(e) =>
+                          setAdminAccountForm({
+                            ...adminAccountForm,
+                            adminUsername: e.target.value,
+                          })
+                        }
+                        placeholder="e.g., admin"
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-600 mb-1 font-medium">
+                        New Password (Optional)
+                      </label>
+                      <input
+                        type="password"
+                        value={adminAccountForm.adminPassword}
+                        onChange={(e) =>
+                          setAdminAccountForm({
+                            ...adminAccountForm,
+                            adminPassword: e.target.value,
+                          })
+                        }
+                        placeholder="Set password..."
+                        className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-slate-900"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {loginError && (
+                <div className="p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 font-medium text-center">
+                  {loginError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full py-2.5 px-4 rounded-lg bg-[#1D5464] hover:bg-[#16424F] text-white font-bold text-sm cursor-pointer"
+              >
+                {loginMode === 'CREATE_ADMIN'
+                  ? 'Save Admin ID & Open'
+                  : 'Login & Open System'}
+              </button>
+            </form>
+          </div>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================================
+          SECURE CHANGE PIN MODAL (WITH LAPTOP ← BACK, —, □, ✕)
+         ===================================================================== */}
+      {showChangePinModal && isChangePinMinimized && (
+        <div className="fixed bottom-4 right-4 z-50 bg-[#1D5464] text-white rounded-xl shadow-2xl border border-white/20 px-3.5 py-2 flex items-center gap-2.5 text-xs">
+          <KeyRound className="w-4 h-4 text-teal-200 shrink-0" />
+          <span className="font-semibold whitespace-nowrap">
+            Change Security PIN
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setIsChangePinMinimized(false);
+              setIsChangePinFullScreen(false);
+            }}
+            className="h-7 w-7 rounded bg-white/15 hover:bg-white/25 text-white inline-flex items-center justify-center cursor-pointer"
+            title="Restore Window"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setShowChangePinModal(false);
+              setIsChangePinMinimized(false);
+              setIsChangePinFullScreen(false);
+            }}
+            className="h-7 w-7 rounded bg-rose-600 hover:bg-rose-700 text-white inline-flex items-center justify-center cursor-pointer"
+            title="Close (✕)"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {showChangePinModal && !isChangePinMinimized && (
+        <div
+          className={`fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center overflow-y-auto ${
+            isChangePinFullScreen ? 'p-0' : 'p-4'
+          }`}
+        >
+          <form
+            onSubmit={handleSaveNewSecurityPin}
+            className={`bg-white border border-slate-200 w-full space-y-4 text-xs ${
+              isChangePinFullScreen
+                ? 'w-screen min-h-screen max-w-none rounded-none p-6 md:p-12 flex flex-col justify-center'
+                : 'rounded-xl max-w-md p-6'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChangePinModal(false);
+                    setIsChangePinMinimized(false);
+                    setIsChangePinFullScreen(false);
+                  }}
+                  className="h-8 w-8 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 inline-flex items-center justify-center cursor-pointer transition-colors"
+                  title="Back (←)"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Change Security PIN (Protected)
+                </h3>
               </div>
-              <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 mt-1">
-                {labOrders.length} Samples
-              </div>
-              <div className="text-xs text-slate-500 mt-1.5">
-                Verified Reports: {labOrders.filter((l) => l.status === 'VERIFIED').length} · Pending: {labOrders.filter((l) => l.status !== 'VERIFIED').length}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setIsChangePinMinimized(true)}
+                  className="h-8 w-8 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 inline-flex items-center justify-center cursor-pointer transition-colors"
+                  title="Minimize (—)"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsChangePinFullScreen((prev) => !prev)}
+                  className="h-8 w-8 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 inline-flex items-center justify-center cursor-pointer transition-colors"
+                  title={isChangePinFullScreen ? 'Restore Down' : 'Maximize / Full Screen'}
+                >
+                  {isChangePinFullScreen ? (
+                    <Minimize2 className="w-3.5 h-3.5" />
+                  ) : (
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowChangePinModal(false);
+                    setIsChangePinMinimized(false);
+                    setIsChangePinFullScreen(false);
+                    setPinModalError('');
+                    setOldPinInput('');
+                    setNewPinInput('');
+                    setConfirmNewPinInput('');
+                  }}
+                  className="h-8 w-8 rounded-md bg-rose-600 hover:bg-rose-700 text-white inline-flex items-center justify-center cursor-pointer transition-colors"
+                  title="Close (✕)"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             </div>
+            <p className="text-slate-500">
+              For security, the existing PIN is hidden. Enter your current (old) PIN first to set a new PIN.
+            </p>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">
+                1. Enter Current (Old) PIN *
+              </label>
+              <input
+                type="password"
+                maxLength={12}
+                value={oldPinInput}
+                onChange={(e) => setOldPinInput(e.target.value)}
+                placeholder="•••• (Hidden)"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-base tracking-widest text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">
+                2. Enter New Security PIN (4-6 Digits) *
+              </label>
+              <input
+                type="password"
+                maxLength={6}
+                value={newPinInput}
+                onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, ''))}
+                placeholder="••••"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-base tracking-widest text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">
+                3. Confirm New Security PIN *
+              </label>
+              <input
+                type="password"
+                maxLength={6}
+                value={confirmNewPinInput}
+                onChange={(e) => setConfirmNewPinInput(e.target.value.replace(/\D/g, ''))}
+                placeholder="••••"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-base tracking-widest text-slate-900"
+              />
+            </div>
+            {pinModalError && (
+              <div className="p-2.5 rounded bg-rose-50 border border-rose-200 text-rose-700 font-medium">
+                {pinModalError}
+              </div>
+            )}
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowChangePinModal(false);
+                  setPinModalError('');
+                  setOldPinInput('');
+                  setNewPinInput('');
+                  setConfirmNewPinInput('');
+                }}
+                className="px-3 py-1.5 rounded border border-slate-300 text-slate-700 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-1.5 rounded bg-[#1D5464] text-white font-semibold cursor-pointer"
+              >
+                Verify Old PIN &amp; Save
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
-            <div className="bg-white border border-slate-200 rounded-lg p-4">
-              <div className="text-xs text-slate-500">
-                Pharmacy Stock & Expiry Alerts
+      {/* =====================================================================
+          CUSTOMIZE ADMIN ACCOUNT / ID MODAL (WITH LAPTOP ← BACK, —, □, ✕)
+         ===================================================================== */}
+      {showAdminAccountModal && isAdminModalMinimized && (
+        <div className="fixed bottom-4 right-4 z-50 bg-[#1D5464] text-white rounded-xl shadow-2xl border border-white/20 px-3.5 py-2 flex items-center gap-2.5 text-xs">
+          <UserPlus className="w-4 h-4 text-teal-200 shrink-0" />
+          <span className="font-semibold whitespace-nowrap">
+            Customize Admin ID
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setIsAdminModalMinimized(false);
+              setIsAdminModalFullScreen(false);
+            }}
+            className="h-7 w-7 rounded bg-white/15 hover:bg-white/25 text-white inline-flex items-center justify-center cursor-pointer"
+            title="Restore Window"
+          >
+            <Maximize2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={async () => {
+              await autoSaveAdminProfileSilently();
+              setShowAdminAccountModal(false);
+              setIsAdminModalMinimized(false);
+              setIsAdminModalFullScreen(false);
+            }}
+            className="h-7 w-7 rounded bg-rose-600 hover:bg-rose-700 text-white inline-flex items-center justify-center cursor-pointer"
+            title="Close (✕)"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {showAdminAccountModal && !isAdminModalMinimized && (
+        <div
+          className={`fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center overflow-y-auto ${
+            isAdminModalFullScreen ? 'p-0' : 'p-4'
+          }`}
+        >
+          <form
+            onSubmit={handleSaveCustomAdminAccount}
+            className={`bg-white border border-slate-200 w-full space-y-4 text-xs ${
+              isAdminModalFullScreen
+                ? 'w-screen min-h-screen max-w-none rounded-none p-6 md:p-12 flex flex-col justify-center'
+                : 'rounded-xl max-w-md p-6'
+            }`}
+          >
+            <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-200">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await autoSaveAdminProfileSilently();
+                    setShowAdminAccountModal(false);
+                    setIsAdminModalMinimized(false);
+                    setIsAdminModalFullScreen(false);
+                  }}
+                  className="h-8 w-8 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 inline-flex items-center justify-center cursor-pointer transition-colors"
+                  title="Back (←)"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </button>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Customize Admin ID &amp; Profile
+                </h3>
               </div>
-              <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 mt-1">
-                {pharmacyBatches.reduce((a, b) => a + b.stockQty, 0)} Units
-              </div>
-              <div className="text-xs text-amber-700 mt-1.5">
-                {expiringOrLowBatches.length} Batches Require Expiry / Reorder Attention
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await autoSaveAdminProfileSilently();
+                    setIsAdminModalMinimized(true);
+                  }}
+                  className="h-8 w-8 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 inline-flex items-center justify-center cursor-pointer transition-colors"
+                  title="Minimize (—)"
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsAdminModalFullScreen((prev) => !prev)}
+                  className="h-8 w-8 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 inline-flex items-center justify-center cursor-pointer transition-colors"
+                  title={isAdminModalFullScreen ? 'Restore Down' : 'Maximize / Full Screen'}
+                >
+                  {isAdminModalFullScreen ? (
+                    <Minimize2 className="w-3.5 h-3.5" />
+                  ) : (
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await autoSaveAdminProfileSilently();
+                    setShowAdminAccountModal(false);
+                    setIsAdminModalMinimized(false);
+                    setIsAdminModalFullScreen(false);
+                  }}
+                  className="h-8 w-8 rounded-md bg-rose-600 hover:bg-rose-700 text-white inline-flex items-center justify-center cursor-pointer transition-colors"
+                  title="Close (✕)"
+                >
+                  <X className="w-4 h-4" />
+                </button>
               </div>
             </div>
+            <p className="text-slate-500">
+              Create or customize your own Admin Name, Email ID, Login Username, and Password to operate the software under your own identity.
+            </p>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">
+                Admin Full Name
+              </label>
+              <input
+                type="text"
+                value={adminAccountForm.adminFullName}
+                onChange={(e) =>
+                  setAdminAccountForm({ ...adminAccountForm, adminFullName: e.target.value })
+                }
+                placeholder="e.g., Dr. Muhammad Ali / Hospital Admin"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900"
+              />
+            </div>
+            <div>
+              <label className="block text-slate-700 font-semibold mb-1">
+                Admin Email / Official ID (Recorded in History)
+              </label>
+              <input
+                type="text"
+                value={adminAccountForm.adminEmail}
+                onChange={(e) =>
+                  setAdminAccountForm({ ...adminAccountForm, adminEmail: e.target.value })
+                }
+                placeholder="e.g., admin@hospital.local"
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-slate-900"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">
+                  Login Username
+                </label>
+                <input
+                  type="text"
+                  value={adminAccountForm.adminUsername}
+                  onChange={(e) =>
+                    setAdminAccountForm({ ...adminAccountForm, adminUsername: e.target.value })
+                  }
+                  placeholder="e.g., admin"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-slate-900"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-700 font-semibold mb-1">
+                  New Login Password
+                </label>
+                <input
+                  type="password"
+                  value={adminAccountForm.adminPassword}
+                  onChange={(e) =>
+                    setAdminAccountForm({ ...adminAccountForm, adminPassword: e.target.value })
+                  }
+                  placeholder="Leave blank to keep current"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg font-mono text-slate-900"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAdminAccountModal(false)}
+                className="px-3 py-1.5 rounded border border-slate-300 text-slate-700 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="px-4 py-1.5 rounded bg-[#1D5464] text-white font-semibold cursor-pointer"
+              >
+                Save Admin ID &amp; Profile
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
-            <div className="bg-white border border-slate-200 rounded-lg p-4">
-              <div className="text-xs text-slate-500">
-                Consolidated Net Profit ({cur})
+      {/* =====================================================================
+          LEFT DEEP-TEAL SIDEBAR (ALWAYS VISIBLE EVEN IN FULL SCREEN — NEVER DISAPPEARS)
+         ===================================================================== */}
+      <aside className="flex w-56 md:w-64 h-screen overflow-y-auto bg-[#1D5464] text-white flex-col justify-between shrink-0 select-none">
+        <div>
+          {/* Brand Crest & Wordmark (No Developer Name at Top) */}
+          <div className="px-6 py-5 flex items-center gap-3 border-b border-white/10">
+            <div className="w-9 h-9 rounded-lg bg-white/15 flex items-center justify-center text-teal-200 shrink-0">
+              <Stethoscope className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-base font-bold tracking-wide text-white truncate">
+                AL-HIKMAT HMS
               </div>
-              <div className="text-2xl font-bold font-mono tabular-nums text-slate-900 mt-1">
-                {analytics.consolidated.netProfit.toLocaleString()} {cur}
-              </div>
-              <div className="text-xs text-emerald-700 mt-1.5">
-                Double-Entry Balanced (DR = CR: {analytics.totalDebits.toLocaleString()})
+              <div className="text-[10px] text-teal-200/90 truncate">
+                Hospital Management System
               </div>
             </div>
           </div>
 
-          {/* =====================================================================
-              MODULE 0: HOME DASHBOARD — DAILY, WEEKLY & MONTHLY PROFIT/LOSS & GRAPHS
-             ===================================================================== */}
-          {activeModule === 'home' && (
-            <HomeDashboardView
-              hospitalName={settings.hospitalName}
-              currency={cur}
-              analytics={analytics}
-              patients={patients}
-              encounters={encounters}
-              labOrders={labOrders}
-              pharmacyBatches={pharmacyBatches}
-              invoices={invoices}
-              onNavigateModule={(mod) => setActiveModule(mod)}
+          {/* Sidebar Navigation Menu */}
+          <nav className="px-3 py-5 space-y-1.5 text-sm">
+            {(
+              [
+                {
+                  key: 'dashboard',
+                  label: 'Dashboard (P&L)',
+                  mod: 'home' as WorkspaceModule,
+                  icon: LayoutGrid,
+                },
+                {
+                  key: 'records',
+                  label: 'Pharmacy & Stock',
+                  mod: 'pharmacy' as WorkspaceModule,
+                  icon: Pill,
+                },
+                {
+                  key: 'billing',
+                  label: 'Billing, Staff & Salary',
+                  mod: 'billing_hr' as WorkspaceModule,
+                  icon: CreditCard,
+                },
+                {
+                  key: 'laboratory',
+                  label: 'Laboratory Billing',
+                  mod: 'laboratory' as WorkspaceModule,
+                  icon: FlaskConical,
+                },
+                {
+                  key: 'patients',
+                  label: 'Patients & OPD/IPD',
+                  mod: 'clinical' as WorkspaceModule,
+                  icon: Users,
+                },
+                {
+                  key: 'settings',
+                  label: 'History & Backups',
+                  mod: 'accounting_security' as WorkspaceModule,
+                  icon: History,
+                },
+              ] as const
+            ).map((item) => {
+              const IconComp = item.icon;
+              const isSelected = activeModule === item.mod;
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => navigateToOption(item.mod)}
+                  className={`w-full flex items-center gap-3.5 px-4 py-2.5 rounded-lg font-medium transition-colors cursor-pointer text-left ${
+                    isSelected
+                      ? 'bg-[#3B6E7C] text-white font-semibold shadow-xs'
+                      : 'text-teal-100/80 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <IconComp className="w-4 h-4 shrink-0" />
+                  <span>{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Bottom Sidebar Actions & SINGLE Developer Credit at the Very Bottom */}
+        <div className="p-4 border-t border-white/10 space-y-2 text-xs">
+          <div className="px-3 py-2 rounded-lg bg-white/10 text-teal-100 text-[11px] flex items-center justify-between">
+            <span className="flex items-center gap-1.5 font-medium">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              Auto-Backup Active
+            </span>
+            <span className="font-mono text-[10px] text-teal-200">{lastAutoSavedTime}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setIsLockModalMinimized(false);
+              setIsLocked(true);
+            }}
+            className="w-full py-2 px-3 rounded-lg bg-rose-600/90 hover:bg-rose-600 text-white font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>Login / Logout (PIN)</span>
+          </button>
+          <div className="pt-2 border-t border-white/10 text-[11px] text-teal-200 font-semibold text-center">
+            Developed by Sajjad Qaiser Shah
+          </div>
+        </div>
+      </aside>
+
+      {/* =====================================================================
+          RIGHT MAIN WORKSPACE COLUMN (SIDEBAR REMAINS VISIBLE IN FULL SCREEN)
+         ===================================================================== */}
+      <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
+        {/* =====================================================================
+            TOP-MOST LAPTOP WINDOW BAR (ABOVE SEARCH BAR) — ← BACK, —, □, ✕
+           ===================================================================== */}
+        <div className="bg-slate-100 border-b border-slate-200 px-6 py-2 shrink-0 z-30 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <button
+              type="button"
+              onClick={handleGoBackOption}
+              className="h-8 w-8 rounded-md bg-white hover:bg-slate-200 border border-slate-300 text-slate-800 inline-flex items-center justify-center cursor-pointer transition-colors"
+              title="Back (←)"
+            >
+              <ArrowLeft className="w-4 h-4" />
+            </button>
+            <div className="text-xs sm:text-sm font-bold text-slate-900">
+              {getModuleMeta(activeModule).label}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleMinimizeCurrentOption}
+              className="h-8 w-8 rounded-md bg-white hover:bg-slate-200 border border-slate-300 text-slate-700 inline-flex items-center justify-center cursor-pointer transition-colors"
+              title="Minimize (—)"
+            >
+              <Minus className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={toggleBrowserFullScreen}
+              className="h-8 w-8 rounded-md bg-white hover:bg-slate-200 border border-slate-300 text-slate-700 inline-flex items-center justify-center cursor-pointer transition-colors"
+              title={
+                isModuleFullScreen || isAppFullScreen
+                  ? 'Restore Down'
+                  : 'Maximize / Full Screen'
+              }
+            >
+              {isModuleFullScreen || isAppFullScreen ? (
+                <Minimize2 className="w-3.5 h-3.5" />
+              ) : (
+                <Maximize2 className="w-3.5 h-3.5" />
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                await autoSaveAdminProfileSilently();
+                if (activeModule !== 'home') {
+                  setActiveModule('home');
+                  setActiveSidebarKey('dashboard');
+                } else if (isModuleFullScreen || isAppFullScreen) {
+                  setIsModuleFullScreen(false);
+                  setIsAppFullScreen(false);
+                  if (document.fullscreenElement) {
+                    document.exitFullscreen().catch(() => {});
+                  }
+                }
+              }}
+              className="h-8 w-8 rounded-md bg-rose-600 hover:bg-rose-700 text-white inline-flex items-center justify-center cursor-pointer transition-colors"
+              title="Close (✕)"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* TOP WHITE HEADER BAR (SEARCH & QUICK ACTIONS) */}
+        <header className="bg-white border-b border-slate-200/80 px-6 py-3 shrink-0 z-30 flex flex-wrap items-center justify-between gap-4">
+          {/* Left: Search Input Box */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={globalSearchQuery}
+              onChange={(e) => setGlobalSearchQuery(e.target.value)}
+              placeholder="Search people, medicines, invoices, staff, or dates..."
+              className="w-full pl-10 pr-4 py-2 rounded-lg bg-[#F1F5F8] text-xs text-slate-800 placeholder-slate-400 border border-transparent focus:border-[#1D5464]/30 focus:bg-white focus:outline-none transition-all"
             />
-          )}
+          </div>
+
+          {/* Right Header Controls: Total People Quick Summary, PIN Controls, Login / Logout */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="px-3 py-1.5 rounded-lg bg-[#F1F5F8] text-slate-700 text-xs font-semibold flex items-center gap-2">
+              <Users className="w-3.5 h-3.5 text-[#1D5464]" />
+              <span>Patients: {patients.length}</span>
+              <span className="text-slate-300">|</span>
+              <span>Staff: {employees.length}</span>
+              <span className="text-slate-300">|</span>
+              <span>Medicines: {pharmacyBatches.length}</span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsAdminModalMinimized(false);
+                setShowAdminAccountModal(true);
+              }}
+              className="px-3 py-1.5 rounded-lg bg-[#F1F5F8] hover:bg-slate-200 text-slate-800 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+            >
+              <UserPlus className="w-3.5 h-3.5 text-[#1D5464]" />
+              <span>Customize Admin ID</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setOldPinInput('');
+                setNewPinInput('');
+                setConfirmNewPinInput('');
+                setPinModalError('');
+                setIsChangePinMinimized(false);
+                setShowChangePinModal(true);
+              }}
+              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-[#1D5464]" />
+              <span>Change PIN (••••)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsLockModalMinimized(false);
+                setIsLocked(true);
+              }}
+              className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Login / Logout</span>
+            </button>
+
+            {/* User Profile & Active Role Selector */}
+            <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200">
+              <button
+                type="button"
+                onClick={() => setShowAdminAccountModal(true)}
+                title="Click to customize Admin Name, Email & Login ID"
+                className="w-8 h-8 rounded-full bg-[#1D5464] text-white font-bold text-xs flex items-center justify-center shrink-0 cursor-pointer"
+              >
+                {(loggedInStaffName || 'AD').slice(0, 2).toUpperCase()}
+              </button>
+              <div className="text-left">
+                <div className="text-xs font-bold text-slate-900 leading-tight">
+                  {loggedInStaffName}
+                </div>
+                <div className="flex items-center gap-1">
+                  <select
+                    value={activeRole}
+                    onChange={(e) => setActiveRole(e.target.value as StaffRole)}
+                    className="text-[11px] text-slate-500 bg-transparent font-medium cursor-pointer focus:outline-none"
+                  >
+                    <option value="ADMIN">Admin ({loggedInStaffEmail})</option>
+                    <option value="PHARMACIST">Pharmacist</option>
+                    <option value="CASHIER">Cashier</option>
+                    <option value="LAB_TECH">Lab Tech</option>
+                    <option value="ACCOUNTANT">Accountant</option>
+                    <option value="HR_MANAGER">HR Manager</option>
+                    <option value="DOCTOR">Doctor</option>
+                    <option value="NURSE">Nurse</option>
+                    <option value="COOK">Cook / Kitchen</option>
+                    <option value="SWEEPER">Cleaner / Sweeper</option>
+                    <option value="OTHER">Other Staff</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Scrollable Workspace Content Area */}
+        <div className="flex-1 overflow-y-auto flex flex-col">
+          <div
+            className={`flex-1 mx-auto w-full ${
+              isModuleFullScreen || isAppFullScreen ? 'max-w-none' : 'max-w-[1400px]'
+            } px-4 sm:px-7 py-6`}
+          >
+            <div className="space-y-6">
+              {/* Notification Banner */}
+              {statusBanner && (
+                <div
+                  className={`px-4 py-3 rounded-lg border text-xs flex items-center justify-between ${
+                    statusBanner.kind === 'success'
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-900'
+                      : 'bg-red-50 border-red-200 text-red-900'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 font-medium">
+                    {statusBanner.kind === 'success' ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 text-red-700 shrink-0" />
+                    )}
+                    <span>{statusBanner.text}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setStatusBanner(null)}
+                    className="text-xs underline ml-4 cursor-pointer"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
+              {/* =====================================================================
+                  MODULE 0: CONSOLIDATED PROFIT & LOSS HOME DASHBOARD
+                 ===================================================================== */}
+              {activeModule === 'home' && (
+                <HomeDashboardView
+                  hospitalName={settings.hospitalName}
+                  currency={cur}
+                  analytics={analytics}
+                  doctors={doctors}
+                  patients={patients}
+                  encounters={encounters}
+                  labOrders={labOrders}
+                  pharmacyBatches={pharmacyBatches}
+                  invoices={invoices}
+                  supplierBills={supplierBills}
+                  salarySlips={salarySlips}
+                  expenses={expenses}
+                  searchQuery={globalSearchQuery}
+                  onNavigateModule={(mod) => navigateToOption(mod)}
+                />
+              )}
 
           {/* =====================================================================
               MODULE 1: CLINICAL — PATIENT REGISTRY, OPD APPOINTMENTS & IPD ADMISSIONS
@@ -1019,33 +2558,32 @@ export default function App() {
                     01. Central Hospital Patient Registry
                   </h2>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Assigns unique MRN and records separate registration Business Date · Developed by Sajjad Qaiser Shah
+                    Assigns unique MRN and records separate registration Business Date
                   </p>
 
                   <form onSubmit={handleRegisterPatient} className="mt-4 space-y-3 text-xs">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
-                        <label className="block text-slate-600 mb-1">Full Name *</label>
+                        <label className="block text-slate-600 mb-1">Full Name (Optional if Walk-in)</label>
                         <input
                           type="text"
-                          required
                           value={patientForm.fullName}
                           onChange={(e) =>
                             setPatientForm({ ...patientForm, fullName: e.target.value })
                           }
-                          placeholder="e.g., Bilal Hassan"
+                          placeholder="e.g., Bilal Hassan (or leave blank)"
                           className="w-full px-3 py-2 border border-slate-200 rounded-md text-slate-900"
                         />
                       </div>
                       <div>
-                        <label className="block text-slate-600 mb-1">Phone Number *</label>
+                        <label className="block text-slate-600 mb-1">Phone Number (Optional)</label>
                         <input
                           type="text"
-                          required
                           value={patientForm.phone}
                           onChange={(e) =>
                             setPatientForm({ ...patientForm, phone: e.target.value })
                           }
+                          placeholder="Optional phone number"
                           className="w-full px-3 py-2 border border-slate-200 rounded-md font-mono text-slate-900"
                         />
                       </div>
@@ -1288,11 +2826,10 @@ export default function App() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-slate-600 mb-1">
-                          Chief Complaint & Vitals
+                          Chief Complaint &amp; Vitals (Optional)
                         </label>
                         <input
                           type="text"
-                          required
                           value={encounterForm.chiefComplaint}
                           onChange={(e) =>
                             setEncounterForm({
@@ -1300,7 +2837,7 @@ export default function App() {
                               chiefComplaint: e.target.value,
                             })
                           }
-                          placeholder="e.g., Acute abdominal pain, BP 135/85 mmHg"
+                          placeholder="Optional — leave blank if not needed"
                           className="w-full px-3 py-2 border border-slate-200 rounded-md text-slate-900"
                         />
                       </div>
@@ -1366,8 +2903,31 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Patient Registry Directory & Longitudinal Vitals Trend Tracker */}
-              {(() => {
+              {/* Optional Service Toggle: Patient Registry Directory & Longitudinal Vitals Trend Tracker */}
+              <div className="bg-white border border-slate-200 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-slate-900">
+                      03. Patient Registry Directory &amp; Longitudinal Vitals Trend Tracker
+                    </h3>
+                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 text-[11px] font-semibold">
+                      Optional Clinical Tool (Zero Impact on P&amp;L Calculations)
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    If you do not need clinical vitals tracking, keep this section hidden — skipping it has zero effect on Hospital Billing or Profit &amp; Loss calculations.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowVitalsTracker((prev) => !prev)}
+                  className="px-3.5 py-1.5 rounded-lg border border-slate-300 bg-slate-50 hover:bg-slate-100 text-xs font-semibold text-slate-800 cursor-pointer shrink-0"
+                >
+                  {showVitalsTracker ? 'Hide Optional Vitals Tracker' : 'Show Optional Vitals Tracker'}
+                </button>
+              </div>
+
+              {showVitalsTracker && (() => {
                 const selectedPatient =
                   patients.find((p) => p.id === selectedVitalsPatientId) || patients[0];
                 const patientVitals = vitalSigns
@@ -1408,7 +2968,7 @@ export default function App() {
                           03. Patient Registry Directory & Longitudinal Vitals Trend Tracker
                         </h3>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          Track multi-encounter trends in Blood Pressure (mmHg), Heart Rate (bpm), Oxygen Saturation (SpO2 %), and Temperature (°C) · Developed by Sajjad Qaiser Shah
+                          Track multi-encounter trends in Blood Pressure (mmHg), Heart Rate (bpm), Oxygen Saturation (SpO2 %), and Temperature (°C)
                         </p>
                       </div>
 
@@ -1665,9 +3225,6 @@ export default function App() {
                             </label>
                             <input
                               type="number"
-                              required
-                              min={50}
-                              max={280}
                               value={vitalForm.systolicBp}
                               onChange={(e) =>
                                 setVitalForm({
@@ -1684,9 +3241,6 @@ export default function App() {
                             </label>
                             <input
                               type="number"
-                              required
-                              min={30}
-                              max={180}
                               value={vitalForm.diastolicBp}
                               onChange={(e) =>
                                 setVitalForm({
@@ -1706,9 +3260,6 @@ export default function App() {
                             </label>
                             <input
                               type="number"
-                              required
-                              min={30}
-                              max={240}
                               value={vitalForm.heartRate}
                               onChange={(e) =>
                                 setVitalForm({
@@ -1723,9 +3274,6 @@ export default function App() {
                             <label className="block text-slate-600 mb-1">SpO2 (%)</label>
                             <input
                               type="number"
-                              required
-                              min={50}
-                              max={100}
                               value={vitalForm.spo2}
                               onChange={(e) =>
                                 setVitalForm({
@@ -1741,7 +3289,6 @@ export default function App() {
                             <input
                               type="number"
                               step="0.1"
-                              required
                               value={vitalForm.temperatureC}
                               onChange={(e) =>
                                 setVitalForm({
@@ -1941,20 +3488,128 @@ export default function App() {
                 );
               })()}
 
-              {/* Active OPD & IPD Encounters Table */}
+              {/* Searchable Registered Patients / People Directory with Total Count & Delete Option */}
               <div className="bg-white border border-slate-200 rounded-lg p-5">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
                   <div>
-                    <h3 className="text-base font-bold text-slate-900">
-                      04. Active OPD Queue & IPD Admissions Register
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      Real-time clinical encounters synchronized across Reception, Nursing Stations, and Doctor Consultations
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="text-base font-bold text-slate-900">
+                        04. Registered Patients / People Directory
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-md bg-[#1D5464] text-white text-xs font-bold font-mono">
+                        Total People: {patients.length}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Search any registered person by name, MRN, phone number, CNIC, or address, or delete a mistaken entry
                     </p>
                   </div>
-                  <span className="text-xs font-mono text-slate-600">
-                    Total Encounters: {encounters.length}
-                  </span>
+
+                  <div className="relative w-full sm:w-72 text-xs">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={patientSearch}
+                      onChange={(e) => setPatientSearch(e.target.value)}
+                      placeholder="Search person by name, phone, MRN, CNIC..."
+                      className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-slate-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-500">
+                        <th className="py-2.5 font-medium">MRN</th>
+                        <th className="py-2.5 font-medium">Full Name</th>
+                        <th className="py-2.5 font-medium">Age / Gender / Blood</th>
+                        <th className="py-2.5 font-medium">Phone &amp; CNIC</th>
+                        <th className="py-2.5 font-medium">Address &amp; Allergies</th>
+                        <th className="py-2.5 font-medium">Registered Date</th>
+                        <th className="py-2.5 font-medium text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {patients
+                        .filter((p) => {
+                          const q = (patientSearch || globalSearchQuery).trim().toLowerCase();
+                          if (!q) return true;
+                          return (
+                            p.fullName.toLowerCase().includes(q) ||
+                            p.mrn.toLowerCase().includes(q) ||
+                            p.phone.toLowerCase().includes(q) ||
+                            p.cnic.toLowerCase().includes(q) ||
+                            p.address.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((p) => (
+                          <tr key={p.id} className="hover:bg-slate-50">
+                            <td className="py-2.5 font-mono font-bold text-[#1D5464] whitespace-nowrap">
+                              {p.mrn}
+                            </td>
+                            <td className="py-2.5 font-bold text-slate-900 whitespace-nowrap">
+                              {p.fullName}
+                            </td>
+                            <td className="py-2.5 text-slate-700 whitespace-nowrap">
+                              {p.age} yrs · {p.gender} · <strong className="font-mono">{p.bloodGroup}</strong>
+                            </td>
+                            <td className="py-2.5 font-mono text-slate-700 whitespace-nowrap">
+                              <div>{p.phone}</div>
+                              <div className="text-slate-400">{p.cnic}</div>
+                            </td>
+                            <td className="py-2.5 text-slate-700">
+                              <div>{p.address}</div>
+                              <div className="text-rose-700 text-[11px]">Allergies: {p.allergies}</div>
+                            </td>
+                            <td className="py-2.5 font-mono text-slate-700 whitespace-nowrap">
+                              {p.registeredBusinessDate}
+                            </td>
+                            <td className="py-2.5 text-right whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeleteRecord('patient', p.id, `Patient ${p.fullName}`)
+                                }
+                                className="px-2.5 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Delete</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Active OPD & IPD Encounters Table */}
+              <div className="bg-white border border-slate-200 rounded-lg p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="text-base font-bold text-slate-900">
+                        05. Active OPD Queue &amp; IPD Admissions Register
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded-md bg-slate-100 text-slate-800 text-xs font-bold font-mono">
+                        Total Encounters: {encounters.length}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Search encounters by patient name, token, or doctor, or delete mistaken entries
+                    </p>
+                  </div>
+                  <div className="relative w-full sm:w-64 text-xs">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={encounterSearch}
+                      onChange={(e) => setEncounterSearch(e.target.value)}
+                      placeholder="Search OPD/IPD by patient or token..."
+                      className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-slate-900"
+                    />
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -1971,7 +3626,18 @@ export default function App() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {encounters.map((enc) => (
+                      {encounters
+                        .filter((enc) => {
+                          const q = (encounterSearch || globalSearchQuery).trim().toLowerCase();
+                          if (!q) return true;
+                          return (
+                            enc.patientName.toLowerCase().includes(q) ||
+                            enc.tokenNo.toLowerCase().includes(q) ||
+                            enc.doctorName.toLowerCase().includes(q) ||
+                            enc.patientMrn.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((enc) => (
                         <tr key={enc.id} className="hover:bg-slate-50">
                           <td className="py-2.5 font-mono font-semibold text-slate-900 whitespace-nowrap">
                             {enc.tokenNo} · {enc.encounterType}
@@ -1994,7 +3660,7 @@ export default function App() {
                           <td className="py-2.5 font-mono font-semibold text-slate-800 whitespace-nowrap">
                             {enc.status}
                           </td>
-                          <td className="py-2.5 text-right whitespace-nowrap space-x-2">
+                          <td className="py-2.5 text-right whitespace-nowrap space-x-1.5">
                             {enc.encounterType === 'IPD' && enc.status === 'ADMITTED' && (
                               <button
                                 type="button"
@@ -2028,6 +3694,16 @@ export default function App() {
                               <Printer className="w-3 h-3" />
                               <span>Receipt</span>
                             </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDeleteRecord('encounter', enc.id, `Encounter ${enc.tokenNo}`)
+                              }
+                              className="px-2 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Delete</span>
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -2049,7 +3725,7 @@ export default function App() {
                     01. Order Diagnostic Lab Test
                   </h2>
                   <p className="text-xs text-slate-500 mt-0.5">
-                    Generates unique sample barcode, patient invoice, and Laboratory revenue voucher · Developed by Sajjad Qaiser Shah
+                    Generates unique sample barcode, patient invoice, and Laboratory revenue voucher
                   </p>
 
                   <form onSubmit={handleCreateLabOrder} className="mt-4 space-y-3 text-xs">
@@ -2121,11 +3797,11 @@ export default function App() {
                       <label className="block text-slate-600 mb-1">Test Name</label>
                       <input
                         type="text"
-                        required
                         value={labForm.testName}
                         onChange={(e) =>
                           setLabForm({ ...labForm, testName: e.target.value })
                         }
+                        placeholder="e.g., CBC / Blood Sugar / HbA1c"
                         className="w-full px-3 py-2 border border-slate-200 rounded-md text-slate-900"
                       />
                     </div>
@@ -2166,22 +3842,45 @@ export default function App() {
 
                 {/* Barcode Sample Tracking & Result Verification */}
                 <div className="lg:col-span-8 bg-white border border-slate-200 rounded-lg p-5">
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div>
-                      <h2 className="text-base font-bold text-slate-900">
-                        02. Barcode Sample Queue, Result Entry & Pathologist Verification
-                      </h2>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-base font-bold text-slate-900">
+                          02. Barcode Sample Queue, Result Entry &amp; Pathologist Verification
+                        </h2>
+                        <span className="px-2.5 py-0.5 rounded bg-[#1D5464] text-white text-xs font-bold font-mono">
+                          Total Lab Orders: {labOrders.length}
+                        </span>
+                      </div>
                       <p className="text-xs text-slate-500">
-                        Once verified by pathologist, reports are locked for clinical integrity and ready for printing
+                        Search lab orders by patient name, barcode, or test name, verify results, or delete mistaken entries
                       </p>
                     </div>
-                    <span className="text-xs font-mono text-slate-600">
-                      Orders: {labOrders.length}
-                    </span>
+                    <div className="relative w-full sm:w-64 text-xs">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={labSearch}
+                        onChange={(e) => setLabSearch(e.target.value)}
+                        placeholder="Search lab order, patient, barcode..."
+                        className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-slate-900"
+                      />
+                    </div>
                   </div>
 
                   <div className="space-y-4">
-                    {labOrders.map((o) => {
+                    {labOrders
+                      .filter((o) => {
+                        const q = (labSearch || globalSearchQuery).trim().toLowerCase();
+                        if (!q) return true;
+                        return (
+                          o.patientName.toLowerCase().includes(q) ||
+                          o.sampleBarcode.toLowerCase().includes(q) ||
+                          o.testName.toLowerCase().includes(q) ||
+                          o.orderNo.toLowerCase().includes(q)
+                        );
+                      })
+                      .map((o) => {
                       const draft = labVerifyInputs[o.id] ?? {
                         resultValue: o.resultValue,
                         abnormalFlag: o.abnormalFlag,
@@ -2204,8 +3903,20 @@ export default function App() {
                               <span className="text-slate-400">·</span>
                               <span className="text-slate-600">{o.category}</span>
                             </div>
-                            <div className="font-mono font-semibold text-slate-800">
-                              Status: {o.status}
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-semibold text-slate-800">
+                                Status: {o.status} ({o.price.toLocaleString()} {cur})
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeleteRecord('lab-order', o.id, `Lab Order ${o.orderNo}`)
+                                }
+                                className="px-2 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Delete</span>
+                              </button>
                             </div>
                           </div>
 
@@ -2300,47 +4011,23 @@ export default function App() {
           )}
 
           {/* =====================================================================
-              MODULE 3: PHARMACY POS, RETAIL/WHOLESALE, BATCHES, EXPIRY & TRANSFERS
+              MODULE 3: PHARMACY RETAIL POS, SUPPLIER MEDICINE ENTRY & BILLS, STOCK & EXPIRY
              ===================================================================== */}
           {activeModule === 'pharmacy' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Pharmacy POS Counter */}
+                {/* 1. Pharmacy Retail POS Counter (Hospital Retail Only) */}
                 <div className="lg:col-span-5 bg-white border border-slate-200 rounded-lg p-5">
                   <div className="flex items-center justify-between">
                     <h2 className="text-base font-bold text-slate-900">
-                      01. Atomic Pharmacy POS (Retail & Wholesale)
+                      01. Hospital Pharmacy Retail POS
                     </h2>
-                    <div className="flex items-center gap-1 p-0.5 bg-slate-100 rounded">
-                      <button
-                        type="button"
-                        onClick={() => setPosSaleType('RETAIL')}
-                        className={`px-2.5 py-1 text-xs font-medium rounded cursor-pointer ${
-                          posSaleType === 'RETAIL'
-                            ? 'bg-white text-slate-900 shadow-xs'
-                            : 'text-slate-600'
-                        }`}
-                      >
-                        Retail POS
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPosSaleType('WHOLESALE');
-                          setPosCustomerName('City Care Clinic (Wholesale)');
-                        }}
-                        className={`px-2.5 py-1 text-xs font-medium rounded cursor-pointer ${
-                          posSaleType === 'WHOLESALE'
-                            ? 'bg-white text-slate-900 shadow-xs'
-                            : 'text-slate-600'
-                        }`}
-                      >
-                        Wholesale B2B
-                      </button>
-                    </div>
+                    <span className="px-2.5 py-1 text-[11px] font-bold rounded bg-emerald-100 text-emerald-800">
+                      Retail Sale Only
+                    </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
-                    Atomically verifies batch expiry & stock, deducts inventory, and posts both Revenue and Batch COGS vouchers · Developed by Sajjad Qaiser Shah
+                    Automatically deducts sold quantity from stock, calculates profit against supplier wholesale cost, and prints customer receipt
                   </p>
 
                   <form onSubmit={handleCheckoutPos} className="mt-4 space-y-3 text-xs">
@@ -2357,7 +4044,7 @@ export default function App() {
                         />
                       </div>
                       <div>
-                        <label className="block text-slate-600 mb-1">Business Date</label>
+                        <label className="block text-slate-600 mb-1">Sale Date</label>
                         <input
                           type="date"
                           value={posBusinessDate}
@@ -2369,7 +4056,7 @@ export default function App() {
 
                     <div className="space-y-2 pt-2">
                       <div className="flex items-center justify-between text-slate-600 font-medium">
-                        <span>Cart Batch Items</span>
+                        <span>Medicine Items to Sell</span>
                         <button
                           type="button"
                           onClick={() =>
@@ -2378,80 +4065,100 @@ export default function App() {
                               { batchId: pharmacyBatches[0]?.id || 'BAT-501', qty: 1 },
                             ])
                           }
-                          className="text-slate-900 underline flex items-center gap-1 cursor-pointer"
+                          className="text-[#1D5464] font-semibold underline flex items-center gap-1 cursor-pointer"
                         >
                           <Plus className="w-3 h-3" />
-                          <span>Add Line</span>
+                          <span>Add Medicine Row</span>
                         </button>
                       </div>
 
                       {posCart.map((line, idx) => {
                         const batch = pharmacyBatches.find((b) => b.id === line.batchId);
-                        const unitPrice = batch
-                          ? posSaleType === 'WHOLESALE'
-                            ? batch.wholesalePrice
-                            : batch.retailPrice
-                          : 0;
+                        const unitRetail = batch ? batch.retailPrice : 0;
+                        const unitSupplierCost = batch ? batch.unitCost : 0;
+                        const lineProfit = (unitRetail - unitSupplierCost) * line.qty;
                         return (
-                          <div key={idx} className="grid grid-cols-12 gap-2 items-center">
-                            <div className="col-span-7">
-                              <select
-                                value={line.batchId}
-                                onChange={(e) => {
-                                  const next = [...posCart];
-                                  next[idx].batchId = e.target.value;
-                                  setPosCart(next);
-                                }}
-                                className="w-full px-2.5 py-1.5 border border-slate-200 rounded bg-white text-slate-900"
-                              >
-                                {pharmacyBatches.map((b) => (
-                                  <option key={b.id} value={b.id}>
-                                    {b.brandName} [{b.batchNo}] (Avail: {b.stockQty})
-                                  </option>
-                                ))}
-                              </select>
+                          <div key={idx} className="p-2.5 rounded-lg bg-slate-50 border border-slate-200 space-y-1.5">
+                            <div className="grid grid-cols-12 gap-2 items-center">
+                              <div className="col-span-7">
+                                <select
+                                  value={line.batchId}
+                                  onChange={(e) => {
+                                    const next = [...posCart];
+                                    next[idx].batchId = e.target.value;
+                                    setPosCart(next);
+                                  }}
+                                  className="w-full px-2.5 py-1.5 border border-slate-200 rounded bg-white text-slate-900"
+                                >
+                                  {pharmacyBatches.map((b) => (
+                                    <option key={b.id} value={b.id}>
+                                      {b.brandName} (Stock: {b.stockQty}) — Retail: {b.retailPrice}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+                              <div className="col-span-2">
+                                <input
+                                  type="number"
+                                  min={1}
+                                  value={line.qty}
+                                  onChange={(e) => {
+                                    const next = [...posCart];
+                                    next[idx].qty = Math.max(1, Number(e.target.value));
+                                    setPosCart(next);
+                                  }}
+                                  className="w-full px-2 py-1.5 border border-slate-200 rounded font-mono text-right text-slate-900 bg-white"
+                                />
+                              </div>
+                              <div className="col-span-3 text-right font-mono tabular-nums font-bold text-slate-900">
+                                {(unitRetail * line.qty).toLocaleString()} {cur}
+                              </div>
                             </div>
-                            <div className="col-span-2">
-                              <input
-                                type="number"
-                                min={1}
-                                value={line.qty}
-                                onChange={(e) => {
-                                  const next = [...posCart];
-                                  next[idx].qty = Math.max(1, Number(e.target.value));
-                                  setPosCart(next);
-                                }}
-                                className="w-full px-2 py-1.5 border border-slate-200 rounded font-mono text-right text-slate-900"
-                              />
-                            </div>
-                            <div className="col-span-3 text-right font-mono tabular-nums font-semibold">
-                              {(unitPrice * line.qty).toLocaleString()} {cur}
-                            </div>
+                            {batch && (
+                              <div className="flex items-center justify-between text-[11px] font-mono text-slate-500">
+                                <span>
+                                  Supplier Cost: {unitSupplierCost} · Retail: {unitRetail} · Stock Left After Sale: {Math.max(0, batch.stockQty - line.qty)}
+                                </span>
+                                <span className="text-emerald-700 font-semibold">
+                                  Profit: +{lineProfit.toLocaleString()} {cur}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
                     </div>
 
-                    <div className="pt-3 border-t border-slate-200 flex items-center justify-between font-mono text-sm font-bold">
-                      <span>POS Net Total ({posSaleType}):</span>
-                      <span>
-                        {posCart
-                          .reduce((sum, l) => {
-                            const b = pharmacyBatches.find((x) => x.id === l.batchId);
-                            const p = b
-                              ? posSaleType === 'WHOLESALE'
-                                ? b.wholesalePrice
-                                : b.retailPrice
-                              : 0;
-                            return sum + p * l.qty;
-                          }, 0)
-                          .toLocaleString()}{' '}
-                        {cur}
-                      </span>
+                    <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 space-y-1 font-mono text-xs">
+                      <div className="flex items-center justify-between font-bold text-sm text-slate-900">
+                        <span>Customer Total Retail Bill:</span>
+                        <span>
+                          {posCart
+                            .reduce((sum, l) => {
+                              const b = pharmacyBatches.find((x) => x.id === l.batchId);
+                              return sum + (b ? b.retailPrice : 0) * l.qty;
+                            }, 0)
+                            .toLocaleString()}{' '}
+                          {cur}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-emerald-800">
+                        <span>Calculated Net Profit on Sale:</span>
+                        <span>
+                          +
+                          {posCart
+                            .reduce((sum, l) => {
+                              const b = pharmacyBatches.find((x) => x.id === l.batchId);
+                              return sum + (b ? b.retailPrice - b.unitCost : 0) * l.qty;
+                            }, 0)
+                            .toLocaleString()}{' '}
+                          {cur}
+                        </span>
+                      </div>
                     </div>
 
                     <div>
-                      <label className="block text-slate-600 mb-1">Payment Mode</label>
+                      <label className="block text-slate-600 mb-1">Payment Method</label>
                       <select
                         value={posPaymentMethod}
                         onChange={(e) => setPosPaymentMethod(e.target.value as any)}
@@ -2459,257 +4166,660 @@ export default function App() {
                       >
                         <option value="CASH">Cash Counter Settlement</option>
                         <option value="CARD">POS Card Terminal</option>
-                        <option value="CREDIT_LEDGER">Credit Ledger Account</option>
                       </select>
                     </div>
 
                     <button
                       type="submit"
-                      className="w-full py-2.5 px-4 bg-slate-900 text-white font-medium rounded-md hover:bg-slate-800 transition-colors cursor-pointer"
+                      className="w-full py-2.5 px-4 bg-[#1D5464] hover:bg-[#16424F] text-white font-semibold rounded-md transition-colors cursor-pointer"
                     >
-                      Complete Atomic POS Sale & Print Receipt
+                      Complete Retail Sale, Deduct Stock &amp; Print Receipt
                     </button>
                   </form>
                 </div>
 
-                {/* Purchase GRN & Internal Ward Transfer */}
-                <div className="lg:col-span-7 space-y-6">
-                  {/* Receive Purchase GRN */}
-                  <div className="bg-white border border-slate-200 rounded-lg p-5">
-                    <h2 className="text-base font-bold text-slate-900">
-                      02. Receive Supplier Purchase (GRN — Capitalized to Asset)
-                    </h2>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Increases batch inventory and posts DR Pharmacy Inventory Asset / CR Supplier Payable (Never double-counted as expense upon purchase)
-                    </p>
+                {/* 2. Add New Medicine / Supplier Delivery with Supplier Cost, Retail Price, Paid & Remaining Bill */}
+                <div className="lg:col-span-7 bg-white border border-slate-200 rounded-lg p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-base font-bold text-slate-900">
+                        02. Add New Medicine / Supplier Delivery Entry
+                      </h2>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Record supplier wholesale cost price, hospital retail sale price, quantity ordered, and supplier bill paid vs. remaining balance
+                      </p>
+                    </div>
+                  </div>
 
-                    <form onSubmit={handleReceiveGrn} className="mt-4 grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
-                      <div className="sm:col-span-2">
+                  <form onSubmit={handleReceiveGrn} className="mt-4 space-y-3 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-slate-600 mb-1">Supplier / Distributor Name (Optional)</label>
+                        <input
+                          type="text"
+                          value={grnForm.supplierName}
+                          onChange={(e) =>
+                            setGrnForm({ ...grnForm, supplierName: e.target.value })
+                          }
+                          placeholder="e.g., AGP Pharma (or leave blank)"
+                          className="w-full px-3 py-2 border border-slate-200 rounded text-slate-900"
+                        />
+                      </div>
+                      <div>
                         <label className="block text-slate-600 mb-1">Medicine Brand Name</label>
                         <input
                           type="text"
-                          required
                           value={grnForm.brandName}
                           onChange={(e) =>
                             setGrnForm({ ...grnForm, brandName: e.target.value })
                           }
-                          className="w-full px-3 py-1.5 border border-slate-200 rounded text-slate-900"
+                          placeholder="e.g., Panadol 500mg Tablet"
+                          className="w-full px-3 py-2 border border-slate-200 rounded text-slate-900"
                         />
                       </div>
                       <div>
-                        <label className="block text-slate-600 mb-1">Batch Number</label>
+                        <label className="block text-slate-600 mb-1">Generic / Formula Name (Optional)</label>
                         <input
                           type="text"
-                          required
+                          value={grnForm.genericName}
+                          onChange={(e) =>
+                            setGrnForm({ ...grnForm, genericName: e.target.value })
+                          }
+                          placeholder="e.g., Paracetamol 500mg"
+                          className="w-full px-3 py-2 border border-slate-200 rounded text-slate-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div>
+                        <label className="block text-slate-600 mb-1">Category</label>
+                        <select
+                          value={grnForm.category}
+                          onChange={(e) =>
+                            setGrnForm({ ...grnForm, category: e.target.value })
+                          }
+                          className="w-full px-3 py-2 border border-slate-200 rounded bg-white text-slate-900"
+                        >
+                          <option value="Tablet">Tablet</option>
+                          <option value="Capsule">Capsule</option>
+                          <option value="Syrup">Syrup / Suspension</option>
+                          <option value="Injection">Injection / IV Vial</option>
+                          <option value="Surgical">Surgical / Consumable</option>
+                          <option value="Other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-slate-600 mb-1">Batch Number (Optional)</label>
+                        <input
+                          type="text"
                           value={grnForm.batchNo}
                           onChange={(e) =>
                             setGrnForm({ ...grnForm, batchNo: e.target.value })
                           }
-                          className="w-full px-3 py-1.5 border border-slate-200 rounded font-mono text-slate-900"
+                          placeholder="Auto-generated if blank"
+                          className="w-full px-3 py-2 border border-slate-200 rounded font-mono text-slate-900"
                         />
                       </div>
                       <div>
-                        <label className="block text-slate-600 mb-1">Expiry Date</label>
+                        <label className="block text-slate-600 mb-1">Expiry Date (Optional)</label>
                         <input
                           type="date"
-                          required
                           value={grnForm.expiryDate}
                           onChange={(e) =>
                             setGrnForm({ ...grnForm, expiryDate: e.target.value })
                           }
-                          className="w-full px-3 py-1.5 border border-slate-200 rounded font-mono text-slate-900"
+                          className="w-full px-3 py-2 border border-slate-200 rounded font-mono text-slate-900"
                         />
                       </div>
                       <div>
-                        <label className="block text-slate-600 mb-1">Qty Received</label>
+                        <label className="block text-slate-600 mb-1">Purchase Date</label>
+                        <input
+                          type="date"
+                          value={grnForm.businessDate}
+                          onChange={(e) =>
+                            setGrnForm({ ...grnForm, businessDate: e.target.value })
+                          }
+                          className="w-full px-3 py-2 border border-slate-200 rounded font-mono text-slate-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                      <div>
+                        <label className="block text-slate-600 mb-1 font-semibold">
+                          Qty Ordered (Units/Tablets)
+                        </label>
                         <input
                           type="number"
                           value={grnForm.qty}
-                          onChange={(e) =>
-                            setGrnForm({ ...grnForm, qty: Number(e.target.value) })
-                          }
-                          className="w-full px-3 py-1.5 border border-slate-200 rounded font-mono text-slate-900"
+                          onChange={(e) => {
+                            const nextQty = Math.max(0, Number(e.target.value));
+                            setGrnForm({
+                              ...grnForm,
+                              qty: nextQty,
+                              paidAmount: nextQty * grnForm.unitCost,
+                            });
+                          }}
+                          className="w-full px-3 py-2 border border-slate-300 rounded font-mono font-bold text-slate-900"
                         />
                       </div>
                       <div>
-                        <label className="block text-slate-600 mb-1">Unit Cost ({cur})</label>
+                        <label className="block text-slate-600 mb-1 font-semibold">
+                          Supplier Wholesale Cost / Unit
+                        </label>
                         <input
                           type="number"
                           value={grnForm.unitCost}
-                          onChange={(e) =>
-                            setGrnForm({ ...grnForm, unitCost: Number(e.target.value) })
-                          }
-                          className="w-full px-3 py-1.5 border border-slate-200 rounded font-mono text-slate-900"
+                          onChange={(e) => {
+                            const nextCost = Math.max(0, Number(e.target.value));
+                            setGrnForm({
+                              ...grnForm,
+                              unitCost: nextCost,
+                              wholesalePrice: nextCost,
+                              paidAmount: grnForm.qty * nextCost,
+                            });
+                          }}
+                          className="w-full px-3 py-2 border border-slate-300 rounded font-mono font-bold text-slate-900"
                         />
                       </div>
                       <div>
-                        <label className="block text-slate-600 mb-1">Retail Price ({cur})</label>
+                        <label className="block text-slate-600 mb-1 font-semibold">
+                          Hospital Retail Price / Unit
+                        </label>
                         <input
                           type="number"
                           value={grnForm.retailPrice}
                           onChange={(e) =>
-                            setGrnForm({ ...grnForm, retailPrice: Number(e.target.value) })
-                          }
-                          className="w-full px-3 py-1.5 border border-slate-200 rounded font-mono text-slate-900"
-                        />
-                      </div>
-                      <div className="flex items-end">
-                        <button
-                          type="submit"
-                          className="w-full py-1.5 px-3 bg-slate-900 text-white font-medium rounded hover:bg-slate-800 transition-colors cursor-pointer"
-                        >
-                          Receive Batch GRN
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-
-                  {/* Internal Stock Transfer */}
-                  <div className="bg-white border border-slate-200 rounded-lg p-5">
-                    <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                      <ArrowRightLeft className="w-4 h-4 text-slate-700" />
-                      <span>03. Internal Interdepartmental Ward Transfer (Non-Revenue)</span>
-                    </h2>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Moves stock from Main Pharmacy Store to IPD Ward Emergency Consignment without inflating hospital or pharmacy revenue
-                    </p>
-
-                    <form onSubmit={handleInternalTransfer} className="mt-4 grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
-                      <div className="sm:col-span-2">
-                        <label className="block text-slate-600 mb-1">Medicine Batch</label>
-                        <select
-                          value={transferForm.batchId}
-                          onChange={(e) =>
-                            setTransferForm({ ...transferForm, batchId: e.target.value })
-                          }
-                          className="w-full px-3 py-1.5 border border-slate-200 rounded bg-white text-slate-900"
-                        >
-                          {pharmacyBatches.map((b) => (
-                            <option key={b.id} value={b.id}>
-                              {b.brandName} [{b.batchNo}] (Main Stock: {b.stockQty})
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-slate-600 mb-1">Transfer Qty</label>
-                        <input
-                          type="number"
-                          min={1}
-                          value={transferForm.qty}
-                          onChange={(e) =>
-                            setTransferForm({
-                              ...transferForm,
-                              qty: Number(e.target.value),
+                            setGrnForm({
+                              ...grnForm,
+                              retailPrice: Math.max(0, Number(e.target.value)),
                             })
                           }
-                          className="w-full px-3 py-1.5 border border-slate-200 rounded font-mono text-slate-900"
+                          className="w-full px-3 py-2 border border-slate-300 rounded font-mono font-bold text-emerald-800"
                         />
                       </div>
-                      <div className="flex items-end">
-                        <button
-                          type="submit"
-                          className="w-full py-1.5 px-3 border border-slate-900 text-slate-900 font-medium rounded hover:bg-slate-100 transition-colors cursor-pointer"
-                        >
-                          Transfer to IPD Ward
-                        </button>
+                      <div>
+                        <label className="block text-slate-600 mb-1 font-semibold">
+                          Bill Amount Paid Now ({cur})
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={grnForm.qty * grnForm.unitCost}
+                          value={grnForm.paidAmount}
+                          onChange={(e) =>
+                            setGrnForm({
+                              ...grnForm,
+                              paidAmount: Math.max(0, Number(e.target.value)),
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-slate-300 rounded font-mono font-bold text-[#1D5464]"
+                        />
                       </div>
-                    </form>
-                  </div>
+                    </div>
+
+                    {/* Live Supplier Bill & Profit Margin Summary Box */}
+                    <div className="p-3.5 rounded-lg bg-[#F1F5F8] border border-slate-200 grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
+                      <div>
+                        <div className="text-[10px] text-slate-500 uppercase">Total Supplier Bill</div>
+                        <div className="text-sm font-bold text-slate-900">
+                          {(grnForm.qty * grnForm.unitCost).toLocaleString()} {cur}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-500 uppercase">Bill Paid Now</div>
+                        <div className="text-sm font-bold text-emerald-700">
+                          {Math.min(grnForm.qty * grnForm.unitCost, grnForm.paidAmount).toLocaleString()} {cur}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-500 uppercase">Remaining Payable</div>
+                        <div className="text-sm font-bold text-amber-700">
+                          {Math.max(0, grnForm.qty * grnForm.unitCost - grnForm.paidAmount).toLocaleString()} {cur}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] text-slate-500 uppercase">Profit Margin / Unit</div>
+                        <div className="text-sm font-bold text-emerald-700">
+                          +{Math.max(0, grnForm.retailPrice - grnForm.unitCost).toLocaleString()} {cur}
+                        </div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 px-4 bg-slate-900 text-white font-semibold rounded-md hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      Add Medicine to Stock &amp; Save Supplier Bill
+                    </button>
+                  </form>
                 </div>
               </div>
 
-              {/* Complete Pharmacy Batch Inventory & Expiry Alert Table */}
+              {/* 3. Complete Pharmacy Product Search, Stock Availability & Expiry Status Table */}
               <div className="bg-white border border-slate-200 rounded-lg p-5">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4">
                   <div>
                     <h3 className="text-base font-bold text-slate-900">
-                      04. Pharmacy Batch Inventory, Expiry & Reorder Control
+                      03. Complete Pharmacy Medicine Inventory, Search &amp; Expiry Control ({pharmacyBatches.length} Products)
                     </h3>
                     <p className="text-xs text-slate-500">
-                      Tracks batch numbers, expiry dates, main store stock, IPD ward consignment stock, unit cost, retail, and wholesale prices
+                      Search any medicine to verify whether it is in stock, out of stock, or expired, along with supplier cost and retail price
                     </p>
                   </div>
-                  <span className="text-xs font-mono text-slate-600">
-                    Active Batches: {pharmacyBatches.length}
-                  </span>
+
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <div className="relative w-64">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={pharmacySearch}
+                        onChange={(e) => setPharmacySearch(e.target.value)}
+                        placeholder="Search medicine name, formula, batch..."
+                        className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-slate-900"
+                      />
+                    </div>
+                    {(
+                      [
+                        ['ALL', 'All Medicines'],
+                        ['IN_STOCK', 'Available in Stock'],
+                        ['LOW_OR_OUT', 'Low / Out of Stock'],
+                        ['EXPIRING_OR_EXPIRED', 'Expired / Expiring Soon'],
+                      ] as const
+                    ).map(([k, label]) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => setPharmacyFilter(k)}
+                        className={`px-3 py-1.5 rounded-lg font-semibold cursor-pointer ${
+                          pharmacyFilter === k
+                            ? 'bg-[#1D5464] text-white'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse text-xs">
                     <thead>
                       <tr className="border-b border-slate-200 text-slate-500">
-                        <th className="py-2.5 font-medium">SKU & Batch</th>
-                        <th className="py-2.5 font-medium">Brand & Generic Name</th>
+                        <th className="py-2.5 font-medium">Medicine Name &amp; Formula</th>
+                        <th className="py-2.5 font-medium">Category &amp; Batch</th>
+                        <th className="py-2.5 font-medium">Supplier</th>
                         <th className="py-2.5 font-medium">Expiry Date</th>
-                        <th className="py-2.5 font-medium text-right">Main Stock</th>
-                        <th className="py-2.5 font-medium text-right">IPD Ward Stock</th>
-                        <th className="py-2.5 font-medium text-right">Unit Cost ({cur})</th>
-                        <th className="py-2.5 font-medium text-right">Retail ({cur})</th>
-                        <th className="py-2.5 font-medium text-right">Wholesale ({cur})</th>
-                        <th className="py-2.5 font-medium">Alert Status</th>
+                        <th className="py-2.5 font-medium text-right">Available Stock</th>
+                        <th className="py-2.5 font-medium text-right">Supplier Cost ({cur})</th>
+                        <th className="py-2.5 font-medium text-right">Retail Price ({cur})</th>
+                        <th className="py-2.5 font-medium text-right">Profit / Unit ({cur})</th>
+                        <th className="py-2.5 font-medium text-right">Availability &amp; Expiry Status</th>
+                        <th className="py-2.5 font-medium text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {pharmacyBatches.map((b) => {
-                        const isExpiringSoon = b.expiryDate <= '2026-12-31';
-                        const isLowStock = b.stockQty <= b.reorderLevel;
-                        return (
-                          <tr key={b.id} className="hover:bg-slate-50">
+                      {pharmacyBatches
+                        .filter((b) => {
+                          const q = (pharmacySearch || globalSearchQuery).trim().toLowerCase();
+                          if (
+                            q &&
+                            !b.brandName.toLowerCase().includes(q) &&
+                            !b.genericName.toLowerCase().includes(q) &&
+                            !b.batchNo.toLowerCase().includes(q) &&
+                            !b.supplierName.toLowerCase().includes(q)
+                          ) {
+                            return false;
+                          }
+                          if (pharmacyFilter === 'IN_STOCK') return b.stockQty > 0 && b.expiryDate >= '2026-10-10';
+                          if (pharmacyFilter === 'LOW_OR_OUT') return b.stockQty <= b.reorderLevel;
+                          if (pharmacyFilter === 'EXPIRING_OR_EXPIRED') return b.expiryDate <= '2026-12-31';
+                          return true;
+                        })
+                        .map((b) => {
+                          const isExpired = b.expiryDate < '2026-10-10';
+                          const isExpiringSoon = !isExpired && b.expiryDate <= '2026-12-31';
+                          const isOutOfStock = b.stockQty <= 0;
+                          const isLowStock = b.stockQty > 0 && b.stockQty <= b.reorderLevel;
+                          return (
+                            <tr key={b.id} className="hover:bg-slate-50">
+                              <td className="py-2.5">
+                                <div className="font-bold text-slate-900">{b.brandName}</div>
+                                <div className="text-slate-500">{b.genericName}</div>
+                              </td>
+                              <td className="py-2.5 font-mono text-slate-700 whitespace-nowrap">
+                                {b.category} · {b.batchNo}
+                              </td>
+                              <td className="py-2.5 text-slate-700">{b.supplierName}</td>
+                              <td className="py-2.5 font-mono tabular-nums whitespace-nowrap">
+                                <span
+                                  className={
+                                    isExpired
+                                      ? 'text-rose-700 font-bold'
+                                      : isExpiringSoon
+                                      ? 'text-amber-700 font-semibold'
+                                      : 'text-slate-800'
+                                  }
+                                >
+                                  {b.expiryDate}
+                                </span>
+                              </td>
+                              <td className="py-2.5 text-right font-mono tabular-nums font-bold text-slate-900">
+                                {b.stockQty} units
+                              </td>
+                              <td className="py-2.5 text-right font-mono tabular-nums text-slate-600">
+                                {b.unitCost.toLocaleString()}
+                              </td>
+                              <td className="py-2.5 text-right font-mono tabular-nums font-bold text-slate-900">
+                                {b.retailPrice.toLocaleString()}
+                              </td>
+                              <td className="py-2.5 text-right font-mono tabular-nums font-semibold text-emerald-700">
+                                +{(b.retailPrice - b.unitCost).toLocaleString()}
+                              </td>
+                              <td className="py-2.5 text-right whitespace-nowrap">
+                                {isExpired ? (
+                                  <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-bold text-[10px]">
+                                    EXPIRED
+                                  </span>
+                                ) : isOutOfStock ? (
+                                  <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-bold text-[10px]">
+                                    OUT OF STOCK
+                                  </span>
+                                ) : isExpiringSoon ? (
+                                  <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[10px]">
+                                    EXPIRING SOON
+                                  </span>
+                                ) : isLowStock ? (
+                                  <span className="px-2 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[10px]">
+                                    LOW STOCK ({b.stockQty})
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                                    AVAILABLE IN STOCK
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2.5 text-right whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDeleteRecord(
+                                      'pharmacy-batch',
+                                      b.id,
+                                      `Medicine ${b.brandName}`
+                                    )
+                                  }
+                                  className="px-2 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded inline-flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>Delete</span>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 4. Pharmacy Sales & Customer Medicine Return Register (Return Medicine -> Restores Stock & Adjusts Profit/Loss) */}
+              <div className="bg-white border border-slate-200 rounded-lg p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="text-base font-bold text-slate-900">
+                        04. Pharmacy Sales &amp; Customer Medicine Return Register
+                      </h3>
+                      <span className="px-2.5 py-0.5 rounded bg-[#1D5464] text-white text-xs font-bold font-mono">
+                        Total Sales: {invoices.filter((i) => i.department.startsWith('PHARMACY')).length}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      If a customer returns medicine, click &ldquo;Return Medicine (Stock Wapas)&rdquo; to automatically add tablets back to stock and adjust Profit &amp; Loss
+                    </p>
+                  </div>
+
+                  <div className="relative w-full sm:w-72 text-xs">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={pharmacySaleSearch}
+                      onChange={(e) => setPharmacySaleSearch(e.target.value)}
+                      placeholder="Search sale by customer, medicine, bill no..."
+                      className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-slate-900"
+                    />
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-500">
+                        <th className="py-2.5 font-medium">Bill No &amp; Date</th>
+                        <th className="py-2.5 font-medium">Customer Name</th>
+                        <th className="py-2.5 font-medium">Sold Medicine Items &amp; Qty</th>
+                        <th className="py-2.5 font-medium text-right">Sale Bill ({cur})</th>
+                        <th className="py-2.5 font-medium">Status</th>
+                        <th className="py-2.5 font-medium text-right">Return Medicine / Delete / Print</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {invoices
+                        .filter((inv) => inv.department.startsWith('PHARMACY'))
+                        .filter((inv) => {
+                          const q = (pharmacySaleSearch || globalSearchQuery).trim().toLowerCase();
+                          if (!q) return true;
+                          return (
+                            inv.invoiceNo.toLowerCase().includes(q) ||
+                            inv.customerName.toLowerCase().includes(q) ||
+                            inv.businessDate.toLowerCase().includes(q) ||
+                            inv.items.some((it) => it.description.toLowerCase().includes(q))
+                          );
+                        })
+                        .map((inv) => (
+                          <tr key={inv.id} className="hover:bg-slate-50">
                             <td className="py-2.5 font-mono font-semibold text-slate-900 whitespace-nowrap">
-                              {b.sku} · {b.batchNo}
+                              {inv.invoiceNo} · {inv.businessDate}
                             </td>
-                            <td className="py-2.5">
-                              <div className="font-semibold text-slate-900">{b.brandName}</div>
-                              <div className="text-slate-500">
-                                {b.genericName} · {b.supplierName}
-                              </div>
+                            <td className="py-2.5 font-medium text-slate-900 whitespace-nowrap">
+                              {inv.customerName}
                             </td>
-                            <td className="py-2.5 font-mono tabular-nums whitespace-nowrap">
-                              <span
-                                className={
-                                  isExpiringSoon
-                                    ? 'text-amber-700 font-semibold'
-                                    : 'text-slate-800'
-                                }
+                            <td className="py-2.5 text-slate-800">
+                              {inv.items.length > 0
+                                ? inv.items
+                                    .map((it) => `${it.qty}x ${it.description} (${it.lineTotal} ${cur})`)
+                                    .join(' · ')
+                                : 'All items returned to stock'}
+                            </td>
+                            <td className="py-2.5 text-right font-mono tabular-nums font-bold text-slate-900 whitespace-nowrap">
+                              {inv.netTotal.toLocaleString()}
+                              {inv.refundedAmount > 0 && (
+                                <span className="block text-[10px] text-rose-700">
+                                  Returned: -{inv.refundedAmount.toLocaleString()}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2.5 font-mono font-bold whitespace-nowrap">
+                              {inv.status === 'REFUNDED' ? (
+                                <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 text-[10px]">
+                                  RETURNED TO STOCK
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 text-[10px]">
+                                  {inv.status}
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2.5 text-right whitespace-nowrap space-x-1.5">
+                              {inv.status !== 'REFUNDED' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleReturnPharmacySale(inv)}
+                                  className="px-2.5 py-1 text-xs font-semibold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded inline-flex items-center gap-1 cursor-pointer"
+                                >
+                                  <RotateCcw className="w-3 h-3" />
+                                  <span>Return Medicine (Stock Wapas)</span>
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setPrintableDoc({ type: 'INVOICE', data: inv })}
+                                className="px-2.5 py-1 text-xs font-medium text-slate-800 border border-slate-300 rounded hover:bg-slate-100 inline-flex items-center gap-1 cursor-pointer"
                               >
-                                {b.expiryDate}
-                              </span>
-                            </td>
-                            <td className="py-2.5 text-right font-mono tabular-nums font-bold text-slate-900">
-                              {b.stockQty}
-                            </td>
-                            <td className="py-2.5 text-right font-mono tabular-nums text-slate-600">
-                              {b.wardStockQty}
-                            </td>
-                            <td className="py-2.5 text-right font-mono tabular-nums text-slate-600">
-                              {b.unitCost.toLocaleString()}
-                            </td>
-                            <td className="py-2.5 text-right font-mono tabular-nums font-semibold text-slate-900">
-                              {b.retailPrice.toLocaleString()}
-                            </td>
-                            <td className="py-2.5 text-right font-mono tabular-nums text-slate-700">
-                              {b.wholesalePrice.toLocaleString()}
-                            </td>
-                            <td className="py-2.5 whitespace-nowrap">
-                              {isExpiringSoon && (
-                                <span className="text-amber-700 font-medium">
-                                  Expiring Soon (&lt;90d)
-                                </span>
-                              )}
-                              {isExpiringSoon && isLowStock && <span> · </span>}
-                              {isLowStock && (
-                                <span className="text-red-700 font-medium">
-                                  Low Stock (&le;{b.reorderLevel})
-                                </span>
-                              )}
-                              {!isExpiringSoon && !isLowStock && (
-                                <span className="text-emerald-700">Nominal</span>
-                              )}
+                                <Printer className="w-3 h-3" />
+                                <span>Print</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeleteRecord('invoice', inv.id, `Pharmacy Sale ${inv.invoiceNo}`)
+                                }
+                                className="px-2 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Delete</span>
+                              </button>
                             </td>
                           </tr>
-                        );
-                      })}
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* 5. Supplier Medicine Purchase Bills Register (Total Bill / Paid / Remaining + Search & Delete) */}
+              <div className="bg-white border border-slate-200 rounded-lg p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h3 className="text-base font-bold text-slate-900">
+                        05. Supplier Medicine Purchase Bills ({supplierBills.length} Bills)
+                      </h3>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Tracks every medicine delivery from suppliers, total bill amount, paid amount, remaining balance, and allows deleting mistaken entries
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 text-xs">
+                    <div className="relative w-56">
+                      <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                      <input
+                        type="text"
+                        value={supplierBillSearch}
+                        onChange={(e) => setSupplierBillSearch(e.target.value)}
+                        placeholder="Search supplier or medicine..."
+                        className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-slate-900"
+                      />
+                    </div>
+                    <div className="flex items-center gap-3 font-mono">
+                      <span>
+                        Total:{' '}
+                        <strong>
+                          {supplierBills.reduce((a, b) => a + b.totalBill, 0).toLocaleString()} {cur}
+                        </strong>
+                      </span>
+                      <span className="text-emerald-700">
+                        Paid:{' '}
+                        <strong>
+                          {supplierBills.reduce((a, b) => a + b.paidAmount, 0).toLocaleString()} {cur}
+                        </strong>
+                      </span>
+                      <span className="text-amber-700">
+                        Remaining:{' '}
+                        <strong>
+                          {supplierBills.reduce((a, b) => a + b.remainingAmount, 0).toLocaleString()} {cur}
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-500">
+                        <th className="py-2.5 font-medium">Bill No &amp; Date</th>
+                        <th className="py-2.5 font-medium">Supplier Name</th>
+                        <th className="py-2.5 font-medium">Medicine &amp; Batch</th>
+                        <th className="py-2.5 font-medium text-right">Qty Added</th>
+                        <th className="py-2.5 font-medium text-right">Supplier Cost</th>
+                        <th className="py-2.5 font-medium text-right">Retail Price</th>
+                        <th className="py-2.5 font-medium text-right">Total Bill ({cur})</th>
+                        <th className="py-2.5 font-medium text-right">Paid ({cur})</th>
+                        <th className="py-2.5 font-medium text-right">Remaining ({cur})</th>
+                        <th className="py-2.5 font-medium text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {supplierBills
+                        .filter((sb) => {
+                          const q = (supplierBillSearch || globalSearchQuery).trim().toLowerCase();
+                          if (!q) return true;
+                          return (
+                            sb.supplierName.toLowerCase().includes(q) ||
+                            sb.brandName.toLowerCase().includes(q) ||
+                            sb.billNo.toLowerCase().includes(q) ||
+                            sb.batchNo.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((sb) => (
+                        <tr key={sb.id} className="hover:bg-slate-50">
+                          <td className="py-2.5 font-mono font-semibold text-slate-900 whitespace-nowrap">
+                            {sb.billNo} · {sb.businessDate}
+                          </td>
+                          <td className="py-2.5 font-medium text-slate-900">{sb.supplierName}</td>
+                          <td className="py-2.5">
+                            <span className="font-semibold text-slate-900">{sb.brandName}</span>{' '}
+                            <span className="font-mono text-slate-500">[{sb.batchNo}]</span>
+                          </td>
+                          <td className="py-2.5 text-right font-mono tabular-nums font-bold">
+                            {sb.qty}
+                          </td>
+                          <td className="py-2.5 text-right font-mono tabular-nums text-slate-600">
+                            {sb.unitCost.toLocaleString()}
+                          </td>
+                          <td className="py-2.5 text-right font-mono tabular-nums text-slate-800">
+                            {sb.retailPrice.toLocaleString()}
+                          </td>
+                          <td className="py-2.5 text-right font-mono tabular-nums font-bold text-slate-900">
+                            {sb.totalBill.toLocaleString()}
+                          </td>
+                          <td className="py-2.5 text-right font-mono tabular-nums text-emerald-700 font-semibold">
+                            {sb.paidAmount.toLocaleString()}
+                          </td>
+                          <td className="py-2.5 text-right font-mono tabular-nums font-bold text-amber-700">
+                            {sb.remainingAmount.toLocaleString()}
+                          </td>
+                          <td className="py-2.5 text-right whitespace-nowrap space-x-1.5">
+                            {sb.remainingAmount > 0 ? (
+                              <button
+                                type="button"
+                                onClick={() => handlePaySupplierBill(sb)}
+                                className="px-2.5 py-1 text-xs font-semibold text-white bg-[#1D5464] rounded hover:bg-[#16424F] cursor-pointer"
+                              >
+                                Pay Remaining ({sb.remainingAmount.toLocaleString()})
+                              </button>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                                FULLY PAID
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleDeleteRecord('supplier-bill', sb.id, `Supplier Bill ${sb.billNo}`)
+                              }
+                              className="px-2 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Delete</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -2718,24 +4828,621 @@ export default function App() {
           )}
 
           {/* =====================================================================
-              MODULE 4: PATIENT BILLING, RECEIPTS, REFUNDS, LEDGERS, EXPENSES & HR PAYROLL
+              MODULE 4: CUSTOMER BILLING & PRINT, STAFF & SALARY SYSTEM, OPERATING EXPENSES
              ===================================================================== */}
           {activeModule === 'billing_hr' && (
             <div className="space-y-6">
-              {/* Complete Patient Billing, Receipts & Refunds Register */}
-              <div className="bg-white border border-slate-200 rounded-lg p-5">
-                <div className="flex items-center justify-between mb-4">
+              {/* Row 1: Create Customer / Patient Bill + Record Operating Expense */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Create Customer Bill Form */}
+                <div className="lg:col-span-7 bg-white border border-slate-200 rounded-lg p-5">
+                  <h2 className="text-base font-bold text-slate-900">
+                    01. Customer / Patient Billing Counter (With Instant Print Receipt)
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Create bills for OPD, IPD, Emergency Procedures, or Laboratory tests and print official customer receipt
+                  </p>
+
+                  <form onSubmit={handleCreateCustomerBill} className="mt-4 space-y-3 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-slate-600 mb-1">Customer / Patient Name (Optional)</label>
+                        <input
+                          type="text"
+                          value={customerBillForm.customerName}
+                          onChange={(e) =>
+                            setCustomerBillForm({
+                              ...customerBillForm,
+                              customerName: e.target.value,
+                            })
+                          }
+                          placeholder="Walk-in Customer (or enter name)"
+                          className="w-full px-3 py-2 border border-slate-200 rounded text-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-600 mb-1">Department</label>
+                        <select
+                          value={customerBillForm.department}
+                          onChange={(e) =>
+                            setCustomerBillForm({
+                              ...customerBillForm,
+                              department: e.target.value as any,
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-slate-200 rounded bg-white text-slate-900"
+                        >
+                          <option value="HOSPITAL_OPD">Hospital OPD / Consultation</option>
+                          <option value="HOSPITAL_IPD">Hospital IPD / Ward / Surgery</option>
+                          <option value="LABORATORY">Laboratory Diagnostic Billing</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-slate-600 mb-1">Billing Date</label>
+                        <input
+                          type="date"
+                          value={customerBillForm.businessDate}
+                          onChange={(e) =>
+                            setCustomerBillForm({
+                              ...customerBillForm,
+                              businessDate: e.target.value,
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-slate-200 rounded font-mono text-slate-900"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                      <div className="sm:col-span-2">
+                        <label className="block text-slate-600 mb-1">Service / Treatment Description (Optional)</label>
+                        <input
+                          type="text"
+                          value={customerBillForm.description}
+                          onChange={(e) =>
+                            setCustomerBillForm({
+                              ...customerBillForm,
+                              description: e.target.value,
+                            })
+                          }
+                          placeholder="e.g., OPD Consultation / X-Ray / Lab Test"
+                          className="w-full px-3 py-2 border border-slate-200 rounded text-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-600 mb-1">Total Fee ({cur})</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={customerBillForm.unitPrice}
+                          onChange={(e) => {
+                            const p = Math.max(0, Number(e.target.value));
+                            setCustomerBillForm({
+                              ...customerBillForm,
+                              unitPrice: p,
+                              paidAmount: p,
+                            });
+                          }}
+                          className="w-full px-3 py-2 border border-slate-200 rounded font-mono font-bold text-slate-900"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-slate-600 mb-1">Paid Now ({cur})</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={customerBillForm.paidAmount}
+                          onChange={(e) =>
+                            setCustomerBillForm({
+                              ...customerBillForm,
+                              paidAmount: Math.max(0, Number(e.target.value)),
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-slate-200 rounded font-mono font-bold text-emerald-700"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 px-4 bg-[#1D5464] hover:bg-[#16424F] text-white font-semibold rounded-md transition-colors cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      <Printer className="w-4 h-4" />
+                      <span>Save Customer Bill &amp; Print Receipt</span>
+                    </button>
+                  </form>
+                </div>
+
+                {/* Record Departmental Operating Expense */}
+                <div className="lg:col-span-5 bg-white border border-slate-200 rounded-lg p-5">
+                  <h3 className="text-base font-bold text-slate-900">
+                    02. Record Hospital / Lab / Pharmacy Expense
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Automatically deducted from Consolidated Profit &amp; Loss on the Home Dashboard
+                  </p>
+                  <form onSubmit={handleCreateExpense} className="mt-4 space-y-3 text-xs">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-slate-600 mb-1">Department</label>
+                        <select
+                          value={expenseForm.costCenter}
+                          onChange={(e) =>
+                            setExpenseForm({ ...expenseForm, costCenter: e.target.value })
+                          }
+                          className="w-full px-3 py-2 border border-slate-200 rounded bg-white text-slate-900"
+                        >
+                          <option value="HOSPITAL">HOSPITAL (OPD/IPD)</option>
+                          <option value="LABORATORY">LABORATORY</option>
+                          <option value="PHARMACY">PHARMACY</option>
+                          <option value="SHARED_ADMIN">GENERAL ADMIN</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-slate-600 mb-1">Expense Amount ({cur})</label>
+                        <input
+                          type="number"
+                          min={0}
+                          value={expenseForm.amount}
+                          onChange={(e) =>
+                            setExpenseForm({
+                              ...expenseForm,
+                              amount: Number(e.target.value),
+                            })
+                          }
+                          className="w-full px-3 py-2 border border-slate-200 rounded font-mono font-bold text-slate-900"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-slate-600 mb-1">Expense Description (Optional)</label>
+                      <input
+                        type="text"
+                        value={expenseForm.description}
+                        onChange={(e) =>
+                          setExpenseForm({ ...expenseForm, description: e.target.value })
+                        }
+                        placeholder="e.g., Electricity Bill / Generator Fuel / Tea & Kitchen"
+                        className="w-full px-3 py-2 border border-slate-200 rounded text-slate-900"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-600 mb-1">Expense Date</label>
+                      <input
+                        type="date"
+                        value={expenseForm.businessDate}
+                        onChange={(e) =>
+                          setExpenseForm({
+                            ...expenseForm,
+                            businessDate: e.target.value,
+                            paymentDate: e.target.value,
+                          })
+                        }
+                        className="w-full px-3 py-2 border border-slate-200 rounded font-mono text-slate-900"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 px-4 bg-slate-900 text-white font-semibold rounded hover:bg-slate-800 transition-colors cursor-pointer"
+                    >
+                      Save Expense &amp; Deduct from Profit/Loss
+                    </button>
+                  </form>
+                </div>
+              </div>
+
+              {/* Row 2: Staff Management, Add New Staff & Pay Staff Salaries (Integrated with P&L) */}
+              <div className="bg-white border border-slate-200 rounded-lg p-5 space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
                   <div>
-                    <h2 className="text-base font-bold text-slate-900">
-                      01. Patient Billing, Payments, Official Receipts & Refunds Register
-                    </h2>
+                    <h3 className="text-base font-bold text-slate-900">
+                      03. Hospital Staff Directory, Add New Staff &amp; Salary Payment System
+                    </h3>
                     <p className="text-xs text-slate-500">
-                      Preserves finalized invoice audit history · Tracks separate Service Business Date, Payment Date, and Entry Timestamp · Developed by Sajjad Qaiser Shah
+                      Add hospital staff members, pay individual or monthly salaries, save in Salary History, and automatically deduct paid salaries from Hospital Profit &amp; Loss
                     </p>
                   </div>
-                  <span className="text-xs font-mono text-slate-600">
-                    Invoices: {invoices.length}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                    <input
+                      type="month"
+                      value={payrollMonth}
+                      onChange={(e) => setPayrollMonth(e.target.value)}
+                      className="h-10 px-3 border border-slate-300 rounded-lg font-mono text-xs bg-white text-slate-900 focus:outline-none focus:border-[#1D5464]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleRunPayroll}
+                      className="h-10 px-4 text-xs font-semibold text-white bg-[#1D5464] rounded-lg hover:bg-[#16424F] transition-colors cursor-pointer whitespace-nowrap inline-flex items-center justify-center gap-2 shadow-xs"
+                    >
+                      <Wallet className="w-3.5 h-3.5 shrink-0" />
+                      <span>Pay All Staff ({payrollMonth})</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Add New Staff Member Form (With Cook, Sweeper, Guard, Driver & Custom Role Option) */}
+                <form
+                  onSubmit={handleAddStaffMember}
+                  className="p-4 rounded-xl bg-[#F1F5F8] border border-slate-200/90 space-y-4 text-xs"
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 items-end">
+                    <div className="flex flex-col justify-end">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5 leading-none">
+                        Staff Member Full Name
+                      </label>
+                      <input
+                        type="text"
+                        value={newStaffForm.fullName}
+                        onChange={(e) =>
+                          setNewStaffForm({ ...newStaffForm, fullName: e.target.value })
+                        }
+                        placeholder="e.g., Ali Raza / Bashir Ahmed"
+                        className="w-full h-10 px-3 border border-slate-300 rounded-lg bg-white text-xs text-slate-900 focus:outline-none focus:border-[#1D5464]"
+                      />
+                    </div>
+
+                    <div className="flex flex-col justify-end">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5 leading-none">
+                        Job / Field (Or Other)
+                      </label>
+                      <select
+                        value={staffDesignationPreset}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setStaffDesignationPreset(val);
+                          if (val !== 'OTHER_CUSTOM') {
+                            setNewStaffForm({ ...newStaffForm, designation: val });
+                          }
+                        }}
+                        className="w-full h-10 px-3 border border-slate-300 rounded-lg bg-white text-xs text-slate-900 font-medium focus:outline-none focus:border-[#1D5464]"
+                      >
+                        <option value="Doctor / Medical Officer">Doctor / Medical Officer</option>
+                        <option value="Staff Nurse / LHV">Staff Nurse / LHV</option>
+                        <option value="Lab Technologist / Assistant">Lab Technologist / Assistant</option>
+                        <option value="Pharmacist / Dispenser">Pharmacist / Dispenser</option>
+                        <option value="Receptionist / Front Desk">Receptionist / Front Desk</option>
+                        <option value="Cashier / Billing Clerk">Cashier / Billing Clerk</option>
+                        <option value="Accountant / Manager">Accountant / Manager</option>
+                        <option value="Cook / Kitchen Staff (Bawarchi)">Cook / Kitchen Staff (Bawarchi)</option>
+                        <option value="Sweeper / Cleaner (Jharo / Safai Wala)">Sweeper / Cleaner (Jharo / Safai Wala)</option>
+                        <option value="Ward Boy / Aya / Helper">Ward Boy / Aya / Helper</option>
+                        <option value="Security Guard / Chowkidar">Security Guard / Chowkidar</option>
+                        <option value="Ambulance Driver">Ambulance Driver</option>
+                        <option value="Electrician / Maintenance">Electrician / Maintenance</option>
+                        <option value="OTHER_CUSTOM">Other / Custom Job (Khud Likhen)...</option>
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col justify-end">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5 leading-none">
+                        Department
+                      </label>
+                      <select
+                        value={newStaffForm.department}
+                        onChange={(e) =>
+                          setNewStaffForm({
+                            ...newStaffForm,
+                            department: e.target.value as any,
+                          })
+                        }
+                        className="w-full h-10 px-3 border border-slate-300 rounded-lg bg-white text-xs text-slate-900 focus:outline-none focus:border-[#1D5464]"
+                      >
+                        <option value="HOSPITAL">HOSPITAL</option>
+                        <option value="LABORATORY">LABORATORY</option>
+                        <option value="PHARMACY">PHARMACY</option>
+                        <option value="SHARED_ADMIN">GENERAL / ADMIN</option>
+                      </select>
+                    </div>
+
+                    <div className="flex flex-col justify-end">
+                      <label className="block text-xs font-semibold text-slate-700 mb-1.5 leading-none">
+                        Monthly Salary ({cur})
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={newStaffForm.baseSalary}
+                        onChange={(e) =>
+                          setNewStaffForm({
+                            ...newStaffForm,
+                            baseSalary: Number(e.target.value),
+                          })
+                        }
+                        className="w-full h-10 px-3 border border-slate-300 rounded-lg bg-white font-mono font-bold text-xs text-slate-900 focus:outline-none focus:border-[#1D5464]"
+                      />
+                    </div>
+                  </div>
+
+                  {staffDesignationPreset === 'OTHER_CUSTOM' && (
+                    <div className="pt-3 border-t border-slate-200/80 grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                      <div className="md:col-span-6 flex flex-col justify-end">
+                        <label className="block text-xs font-semibold text-slate-700 mb-1.5 leading-none">
+                          Write Custom Job / Field Name (e.g., Cook, Jharo Wala, Mali, Peon, Guard)
+                        </label>
+                        <input
+                          type="text"
+                          value={customStaffDesignation}
+                          onChange={(e) => setCustomStaffDesignation(e.target.value)}
+                          placeholder="Type any custom staff role or duty here..."
+                          className="w-full h-10 px-3 border border-[#1D5464] rounded-lg bg-white text-xs text-slate-900 font-semibold focus:outline-none"
+                        />
+                      </div>
+                      <div className="md:col-span-6 text-[11px] text-slate-500 leading-relaxed">
+                        Whatever custom role you write here will be saved in the Staff Directory and printed on Salary Slips.
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="pt-1">
+                    <button
+                      type="submit"
+                      className="w-full h-10 px-6 bg-[#1D5464] hover:bg-[#16424F] text-white text-xs font-bold rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap text-center shadow-xs"
+                    >
+                      <UserPlus className="w-4 h-4 shrink-0" />
+                      <span>Add New Staff Member</span>
+                    </button>
+                  </div>
+                </form>
+
+                <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6">
+                  {/* Active Staff Roster with Search, Total Count, Pay Salary & Delete */}
+                  <div>
+                    <div className="flex flex-wrap items-center justify-between gap-2.5 mb-3">
+                      <div className="text-xs font-bold text-slate-800">
+                        Active Hospital Staff List (Total Staff: {employees.length})
+                      </div>
+                      <input
+                        type="text"
+                        value={staffSearch}
+                        onChange={(e) => setStaffSearch(e.target.value)}
+                        placeholder="Search staff name or role..."
+                        className="h-9 px-3 border border-slate-300 rounded-lg text-xs text-slate-900 w-52 bg-white focus:outline-none focus:border-[#1D5464]"
+                      />
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-slate-500">
+                            <th className="py-2 font-medium">Staff Name &amp; Role</th>
+                            <th className="py-2 font-medium">Dept</th>
+                            <th className="py-2 font-medium text-right">Monthly Salary</th>
+                            <th className="py-2 font-medium text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {employees
+                            .filter((emp) => {
+                              const q = (staffSearch || globalSearchQuery).trim().toLowerCase();
+                              if (!q) return true;
+                              return (
+                                emp.fullName.toLowerCase().includes(q) ||
+                                emp.designation.toLowerCase().includes(q) ||
+                                emp.department.toLowerCase().includes(q) ||
+                                emp.empCode.toLowerCase().includes(q)
+                              );
+                            })
+                            .map((emp) => (
+                            <tr key={emp.id} className="hover:bg-slate-50">
+                              <td className="py-2.5">
+                                <div className="font-semibold text-slate-900">
+                                  {emp.fullName}
+                                </div>
+                                <div className="text-slate-500">
+                                  {emp.empCode} · {emp.designation}
+                                </div>
+                              </td>
+                              <td className="py-2.5 font-mono text-slate-600">
+                                {emp.department}
+                              </td>
+                              <td className="py-2.5 text-right font-mono tabular-nums font-bold text-slate-900">
+                                {emp.netSalary.toLocaleString()} {cur}
+                              </td>
+                              <td className="py-2.5 text-right whitespace-nowrap">
+                                <div className="inline-flex items-center justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handlePayIndividualSalary(emp)}
+                                    className="h-8 px-3 text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 rounded-md cursor-pointer inline-flex items-center justify-center gap-1.5"
+                                  >
+                                    <Wallet className="w-3.5 h-3.5 shrink-0" />
+                                    <span>Pay Salary</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleDeleteRecord('employee', emp.id, `Staff ${emp.fullName}`)
+                                    }
+                                    className="h-8 px-2.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md inline-flex items-center justify-center gap-1 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                                    <span>Delete</span>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Saved Salary Payment History with Delete Option */}
+                  <div>
+                    <div className="flex items-center justify-between min-h-9 mb-3">
+                      <div className="text-xs font-bold text-slate-800">
+                        Paid Salary History (Total Paid Slips: {salarySlips.length})
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="border-b border-slate-200 text-slate-500">
+                            <th className="py-2 font-medium">Date / Month</th>
+                            <th className="py-2 font-medium">Staff Member</th>
+                            <th className="py-2 font-medium text-right">Paid ({cur})</th>
+                            <th className="py-2 font-medium text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {salarySlips
+                            .filter((s) => {
+                              const q = (staffSearch || globalSearchQuery).trim().toLowerCase();
+                              if (!q) return true;
+                              return (
+                                s.employeeName.toLowerCase().includes(q) ||
+                                s.designation.toLowerCase().includes(q) ||
+                                s.payrollMonth.toLowerCase().includes(q)
+                              );
+                            })
+                            .map((s) => (
+                            <tr key={s.id} className="hover:bg-slate-50">
+                              <td className="py-2.5 font-mono text-slate-800">
+                                <div className="font-semibold">{s.businessDate}</div>
+                                <div className="text-slate-500">{s.payrollMonth}</div>
+                              </td>
+                              <td className="py-2.5">
+                                <div className="font-semibold text-slate-900">{s.employeeName}</div>
+                                <div className="text-slate-500">{s.designation}</div>
+                              </td>
+                              <td className="py-2.5 text-right font-mono tabular-nums font-bold text-rose-700">
+                                -{s.netPaid.toLocaleString()}
+                              </td>
+                              <td className="py-2.5 text-right whitespace-nowrap">
+                                <div className="inline-flex items-center justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setPrintableDoc({ type: 'SALARY_SLIP', data: s })
+                                    }
+                                    className="h-8 px-2.5 text-xs font-medium text-slate-800 border border-slate-300 rounded-md hover:bg-slate-100 inline-flex items-center justify-center gap-1 cursor-pointer"
+                                  >
+                                    <Printer className="w-3.5 h-3.5 shrink-0" />
+                                    <span>Slip</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleDeleteRecord(
+                                        'salary-slip',
+                                        s.id,
+                                        `Salary payment for ${s.employeeName}`
+                                      )
+                                    }
+                                    className="h-8 px-2.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md inline-flex items-center justify-center gap-1 cursor-pointer"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                                    <span>Delete</span>
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 3: Operating Expenses Register with Search & Delete */}
+              <div className="bg-white border border-slate-200 rounded-lg p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900">
+                      04. Recorded Hospital, Lab &amp; Pharmacy Operating Expenses ({expenses.length} Records)
+                    </h2>
+                    <p className="text-xs text-slate-500">
+                      Search expenses or delete any mistaken expense entry (automatically recalculates Profit &amp; Loss)
+                    </p>
+                  </div>
+                  <div className="relative w-full sm:w-64 text-xs">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={expenseSearch}
+                      onChange={(e) => setExpenseSearch(e.target.value)}
+                      placeholder="Search expenses..."
+                      className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-slate-900"
+                    />
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-500">
+                        <th className="py-2 font-medium">Voucher &amp; Date</th>
+                        <th className="py-2 font-medium">Department</th>
+                        <th className="py-2 font-medium">Description</th>
+                        <th className="py-2 font-medium text-right">Amount ({cur})</th>
+                        <th className="py-2 font-medium text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {expenses
+                        .filter((ex) => {
+                          const q = (expenseSearch || globalSearchQuery).trim().toLowerCase();
+                          if (!q) return true;
+                          return (
+                            ex.description.toLowerCase().includes(q) ||
+                            ex.voucherNo.toLowerCase().includes(q) ||
+                            ex.costCenter.toLowerCase().includes(q) ||
+                            ex.businessDate.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((ex) => (
+                          <tr key={ex.id} className="hover:bg-slate-50">
+                            <td className="py-2.5 font-mono font-semibold text-slate-900 whitespace-nowrap">
+                              {ex.voucherNo} · {ex.businessDate}
+                            </td>
+                            <td className="py-2.5 font-mono text-slate-700 whitespace-nowrap">
+                              {ex.costCenter}
+                            </td>
+                            <td className="py-2.5 text-slate-900">{ex.description}</td>
+                            <td className="py-2.5 text-right font-mono tabular-nums font-bold text-rose-700">
+                              -{ex.amount.toLocaleString()}
+                            </td>
+                            <td className="py-2.5 text-right whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeleteRecord('expense', ex.id, `Expense ${ex.voucherNo}`)
+                                }
+                                className="px-2 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Delete</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Row 4: Customer Invoices & Printable Receipts Register with Search, Refund & Delete */}
+              <div className="bg-white border border-slate-200 rounded-lg p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-base font-bold text-slate-900">
+                        05. Customer &amp; Patient Billing Register (Total Bills: {invoices.length})
+                      </h2>
+                    </div>
+                    <p className="text-xs text-slate-500">
+                      Search any customer bill, print receipt, process return/refund, or delete a mistaken bill
+                    </p>
+                  </div>
+                  <div className="relative w-full sm:w-72 text-xs">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      value={billingSearch}
+                      onChange={(e) => setBillingSearch(e.target.value)}
+                      placeholder="Search bill by customer name, invoice no..."
+                      className="w-full pl-8 pr-3 py-1.5 border border-slate-300 rounded-lg text-slate-900"
+                    />
+                  </div>
                 </div>
 
                 <div className="overflow-x-auto">
@@ -2745,18 +5452,28 @@ export default function App() {
                         <th className="py-2.5 font-medium">Invoice No</th>
                         <th className="py-2.5 font-medium">Customer / Patient</th>
                         <th className="py-2.5 font-medium">Department</th>
-                        <th className="py-2.5 font-medium">Business Date</th>
-                        <th className="py-2.5 font-medium">Payment Date</th>
-                        <th className="py-2.5 font-medium text-right">Net Total ({cur})</th>
+                        <th className="py-2.5 font-medium">Date</th>
+                        <th className="py-2.5 font-medium text-right">Total Bill ({cur})</th>
                         <th className="py-2.5 font-medium text-right">Paid ({cur})</th>
-                        <th className="py-2.5 font-medium text-right">Refunded ({cur})</th>
+                        <th className="py-2.5 font-medium text-right">Remaining ({cur})</th>
                         <th className="py-2.5 font-medium">Status</th>
                         <th className="py-2.5 font-medium text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {invoices.map((inv) => {
-                        const due = inv.netTotal - inv.paidAmount - inv.refundedAmount;
+                      {invoices
+                        .filter((inv) => {
+                          const q = (billingSearch || globalSearchQuery).trim().toLowerCase();
+                          if (!q) return true;
+                          return (
+                            inv.invoiceNo.toLowerCase().includes(q) ||
+                            inv.customerName.toLowerCase().includes(q) ||
+                            inv.department.toLowerCase().includes(q) ||
+                            inv.businessDate.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((inv) => {
+                        const due = Math.max(0, inv.netTotal - inv.paidAmount - inv.refundedAmount);
                         return (
                           <tr key={inv.id} className="hover:bg-slate-50">
                             <td className="py-2.5 font-mono font-semibold text-slate-900 whitespace-nowrap">
@@ -2771,52 +5488,58 @@ export default function App() {
                             <td className="py-2.5 font-mono tabular-nums text-slate-800 whitespace-nowrap">
                               {inv.businessDate}
                             </td>
-                            <td className="py-2.5 font-mono tabular-nums text-slate-600 whitespace-nowrap">
-                              {inv.paymentDate || 'Unpaid'}
-                            </td>
                             <td className="py-2.5 text-right font-mono tabular-nums font-semibold text-slate-900">
                               {inv.netTotal.toLocaleString()}
                             </td>
-                            <td className="py-2.5 text-right font-mono tabular-nums text-emerald-700">
+                            <td className="py-2.5 text-right font-mono tabular-nums text-emerald-700 font-semibold">
                               {inv.paidAmount.toLocaleString()}
                             </td>
-                            <td className="py-2.5 text-right font-mono tabular-nums text-amber-700">
-                              {inv.refundedAmount > 0
-                                ? inv.refundedAmount.toLocaleString()
-                                : '—'}
+                            <td className="py-2.5 text-right font-mono tabular-nums font-bold text-amber-700">
+                              {due.toLocaleString()}
                             </td>
                             <td className="py-2.5 font-mono font-semibold text-slate-800">
                               {inv.status}
                             </td>
-                            <td className="py-2.5 text-right whitespace-nowrap space-x-2">
+                            <td className="py-2.5 text-right whitespace-nowrap space-x-1.5">
                               <button
                                 type="button"
                                 onClick={() =>
                                   setPrintableDoc({ type: 'INVOICE', data: inv })
                                 }
-                                className="px-2.5 py-1 text-xs font-medium text-slate-900 border border-slate-300 rounded hover:bg-slate-100 inline-flex items-center gap-1 cursor-pointer"
+                                className="px-2 py-1 text-xs font-semibold text-slate-900 border border-slate-300 rounded hover:bg-slate-100 inline-flex items-center gap-1 cursor-pointer"
                               >
                                 <Printer className="w-3 h-3" />
-                                <span>Receipt</span>
+                                <span>Print</span>
                               </button>
                               {due > 0 && (
                                 <button
                                   type="button"
                                   onClick={() => handleSettleInvoice(inv)}
-                                  className="px-2.5 py-1 text-xs font-medium text-white bg-slate-900 rounded hover:bg-slate-800 cursor-pointer"
+                                  className="px-2 py-1 text-xs font-medium text-white bg-slate-900 rounded hover:bg-slate-800 cursor-pointer"
                                 >
                                   Receive {due.toLocaleString()}
                                 </button>
                               )}
-                              {inv.paidAmount - inv.refundedAmount > 0 && (
+                              {inv.department.startsWith('PHARMACY') && inv.status !== 'REFUNDED' && (
                                 <button
                                   type="button"
-                                  onClick={() => handleRefundInvoice(inv)}
-                                  className="px-2.5 py-1 text-xs font-medium text-amber-800 border border-amber-300 rounded hover:bg-amber-50 cursor-pointer"
+                                  onClick={() => handleReturnPharmacySale(inv)}
+                                  className="px-2 py-1 text-xs font-semibold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded inline-flex items-center gap-1 cursor-pointer"
                                 >
-                                  Refund
+                                  <RotateCcw className="w-3 h-3" />
+                                  <span>Return Medicine</span>
                                 </button>
                               )}
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleDeleteRecord('invoice', inv.id, `Invoice ${inv.invoiceNo}`)
+                                }
+                                className="px-2 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Delete</span>
+                              </button>
                             </td>
                           </tr>
                         );
@@ -2825,267 +5548,241 @@ export default function App() {
                   </table>
                 </div>
               </div>
-
-              {/* Expenses & Supplier/Customer Ledgers */}
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div className="lg:col-span-5 bg-white border border-slate-200 rounded-lg p-5">
-                  <h3 className="text-base font-bold text-slate-900">
-                    02. Record Departmental Operating Expense
-                  </h3>
-                  <form onSubmit={handleCreateExpense} className="mt-3 space-y-3 text-xs">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-slate-600 mb-1">Cost Center</label>
-                        <select
-                          value={expenseForm.costCenter}
-                          onChange={(e) =>
-                            setExpenseForm({ ...expenseForm, costCenter: e.target.value })
-                          }
-                          className="w-full px-3 py-2 border border-slate-200 rounded bg-white text-slate-900"
-                        >
-                          <option value="HOSPITAL">HOSPITAL (OPD/IPD)</option>
-                          <option value="LABORATORY">LABORATORY</option>
-                          <option value="PHARMACY">PHARMACY</option>
-                          <option value="SHARED_ADMIN">SHARED_ADMIN</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-slate-600 mb-1">Amount ({cur})</label>
-                        <input
-                          type="number"
-                          value={expenseForm.amount}
-                          onChange={(e) =>
-                            setExpenseForm({
-                              ...expenseForm,
-                              amount: Number(e.target.value),
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-slate-200 rounded font-mono text-slate-900"
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-slate-600 mb-1">Expense Description *</label>
-                      <input
-                        type="text"
-                        required
-                        value={expenseForm.description}
-                        onChange={(e) =>
-                          setExpenseForm({ ...expenseForm, description: e.target.value })
-                        }
-                        placeholder="e.g., Backup Generator Diesel Refill (200 Liters)"
-                        className="w-full px-3 py-2 border border-slate-200 rounded text-slate-900"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-slate-600 mb-1">Business Date</label>
-                        <input
-                          type="date"
-                          value={expenseForm.businessDate}
-                          onChange={(e) =>
-                            setExpenseForm({
-                              ...expenseForm,
-                              businessDate: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-slate-200 rounded font-mono text-slate-900"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-slate-600 mb-1">Payment Date</label>
-                        <input
-                          type="date"
-                          value={expenseForm.paymentDate}
-                          onChange={(e) =>
-                            setExpenseForm({
-                              ...expenseForm,
-                              paymentDate: e.target.value,
-                            })
-                          }
-                          className="w-full px-3 py-2 border border-slate-200 rounded font-mono text-slate-900"
-                        />
-                      </div>
-                    </div>
-                    <button
-                      type="submit"
-                      className="w-full py-2 px-4 bg-slate-900 text-white font-medium rounded hover:bg-slate-800 transition-colors cursor-pointer"
-                    >
-                      Post Expense Voucher
-                    </button>
-                  </form>
-                </div>
-
-                {/* Supplier & Wholesale Customer Ledgers */}
-                <div className="lg:col-span-7 bg-white border border-slate-200 rounded-lg p-5">
-                  <h3 className="text-base font-bold text-slate-900">
-                    03. Supplier Payable & Wholesale Customer Receivable Ledgers
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Real-time running balances updated automatically on credit GRNs, wholesale sales, and settlements
-                  </p>
-                  <div className="overflow-x-auto mt-3">
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="border-b border-slate-200 text-slate-500">
-                          <th className="py-2 font-medium">Party Name & Type</th>
-                          <th className="py-2 font-medium text-right">Total Billed ({cur})</th>
-                          <th className="py-2 font-medium text-right">Total Settled ({cur})</th>
-                          <th className="py-2 font-medium text-right">Running Balance ({cur})</th>
-                          <th className="py-2 font-medium text-right">Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {ledgerParties.map((p) => (
-                          <tr key={p.id} className="hover:bg-slate-50">
-                            <td className="py-2.5">
-                              <div className="font-semibold text-slate-900">{p.name}</div>
-                              <div className="text-slate-500 font-mono">
-                                {p.partyType} · {p.phone}
-                              </div>
-                            </td>
-                            <td className="py-2.5 text-right font-mono tabular-nums">
-                              {p.totalBilledOrPurchased.toLocaleString()}
-                            </td>
-                            <td className="py-2.5 text-right font-mono tabular-nums text-emerald-700">
-                              {p.totalPaidOrReceived.toLocaleString()}
-                            </td>
-                            <td className="py-2.5 text-right font-mono tabular-nums font-bold text-slate-900">
-                              {p.currentBalance.toLocaleString()}
-                            </td>
-                            <td className="py-2.5 text-right">
-                              {p.currentBalance > 0 && (
-                                <button
-                                  type="button"
-                                  onClick={() => handleSettleParty(p)}
-                                  className="px-2.5 py-1 text-xs font-medium text-slate-900 border border-slate-300 rounded hover:bg-slate-100 cursor-pointer"
-                                >
-                                  Settle 25,000
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-
-              {/* HR Employee Roster, Payroll Execution & Salary History */}
-              <div className="bg-white border border-slate-200 rounded-lg p-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">
-                      04. HR Staff Directory, Monthly Payroll Run & Salary History
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      Generates itemized salary slips and posts departmental payroll vouchers to the General Ledger
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="month"
-                      value={payrollMonth}
-                      onChange={(e) => setPayrollMonth(e.target.value)}
-                      className="px-2.5 py-1.5 border border-slate-200 rounded font-mono text-xs"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleRunPayroll}
-                      className="px-4 py-2 text-xs font-medium text-white bg-slate-900 rounded hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap"
-                    >
-                      Disburse {payrollMonth} Payroll
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4">
-                  <div>
-                    <div className="text-xs font-semibold text-slate-700 mb-2">
-                      Active Hospital Staff ({employees.length})
-                    </div>
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="border-b border-slate-200 text-slate-500">
-                          <th className="py-2 font-medium">Employee</th>
-                          <th className="py-2 font-medium">Cost Center</th>
-                          <th className="py-2 font-medium text-right">Net Salary ({cur})</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {employees.map((emp) => (
-                          <tr key={emp.id}>
-                            <td className="py-2">
-                              <div className="font-semibold text-slate-900">
-                                {emp.fullName}
-                              </div>
-                              <div className="text-slate-500">
-                                {emp.empCode} · {emp.designation}
-                              </div>
-                            </td>
-                            <td className="py-2 font-mono text-slate-600">
-                              {emp.department}
-                            </td>
-                            <td className="py-2 text-right font-mono tabular-nums font-semibold text-slate-900">
-                              {emp.netSalary.toLocaleString()}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  <div>
-                    <div className="text-xs font-semibold text-slate-700 mb-2">
-                      Disbursed Salary History & Official Slips ({salarySlips.length})
-                    </div>
-                    <table className="w-full text-left border-collapse text-xs">
-                      <thead>
-                        <tr className="border-b border-slate-200 text-slate-500">
-                          <th className="py-2 font-medium">Month</th>
-                          <th className="py-2 font-medium">Employee</th>
-                          <th className="py-2 font-medium text-right">Net Paid ({cur})</th>
-                          <th className="py-2 font-medium text-right">Slip</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {salarySlips.map((s) => (
-                          <tr key={s.id}>
-                            <td className="py-2 font-mono font-semibold text-slate-900">
-                              {s.payrollMonth}
-                            </td>
-                            <td className="py-2 text-slate-800">{s.employeeName}</td>
-                            <td className="py-2 text-right font-mono tabular-nums font-semibold text-emerald-700">
-                              {s.netPaid.toLocaleString()}
-                            </td>
-                            <td className="py-2 text-right">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setPrintableDoc({ type: 'SALARY_SLIP', data: s })
-                                }
-                                className="px-2 py-1 text-xs font-medium text-slate-800 border border-slate-300 rounded hover:bg-slate-100 inline-flex items-center gap-1 cursor-pointer"
-                              >
-                                <Printer className="w-3 h-3" />
-                                <span>Slip</span>
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
           {/* =====================================================================
-              MODULE 5: DOUBLE-ENTRY ACCOUNTING, AI ASSISTANT, BACKUPS & GO-LIVE SUITE
+              MODULE 5: COMPLETE HISTORY REGISTER & LAPTOP LOCAL BACKUP CENTER
              ===================================================================== */}
           {activeModule === 'accounting_security' && (
-            <div className="space-y-8">
+            <div className="space-y-6">
+              {/* 1. Automatic Laptop File Backup & History Sync Center */}
+              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      <h2 className="text-base font-bold text-slate-900">
+                        01. Automatic Laptop Backup &amp; History File Center
+                      </h2>
+                      <span className="px-2.5 py-0.5 rounded bg-emerald-100 text-emerald-800 text-xs font-bold">
+                        AUTO-SAVE ACTIVE
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Every transaction, bill, medicine sale, return, salary, and expense is automatically saved to local Backup (`.JSON`) and Master History (`.CSV` Excel) files
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2.5 text-xs">
+                    <button
+                      type="button"
+                      onClick={handleLinkLaptopFolder}
+                      className="px-3.5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white font-semibold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <FolderCheck className="w-4 h-4" />
+                      <span>Link Laptop Folder for Auto-Save</span>
+                    </button>
+                    <a
+                      href="/api/backups/download-history-csv"
+                      download
+                      className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-900 text-white font-semibold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Open Master History (.CSV)</span>
+                    </a>
+                    <a
+                      href="/api/backups/download-laptop"
+                      download
+                      className="px-3.5 py-2 rounded-lg bg-[#1D5464] hover:bg-[#16424F] text-white font-bold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Open Backup File (.JSON)</span>
+                    </a>
+                    <label className="px-3.5 py-2 rounded-lg border border-slate-300 hover:bg-slate-100 text-slate-800 font-semibold flex items-center gap-1.5 cursor-pointer">
+                      <Upload className="w-4 h-4" />
+                      <span>Restore Backup File</span>
+                      <input
+                        type="file"
+                        accept=".json"
+                        onChange={handleRestoreLaptopFile}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg bg-slate-50 border border-slate-200 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">AUTO-SAVED BACKUP FILE</span>
+                    <span className="font-semibold text-slate-900">
+                      Laptop_Auto_Backups/Al_Hikmat_Auto_Backup_Latest.json
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">AUTO-SAVED EXCEL HISTORY FILE</span>
+                    <span className="font-semibold text-slate-900">
+                      Laptop_Auto_Backups/Al_Hikmat_Master_History.csv
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[10px]">SYNC TARGET &amp; LAST SAVED</span>
+                    <span className="font-semibold text-emerald-700">
+                      {laptopFolderName} · {lastAutoSavedTime}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Complete All-Time Hospital History Register */}
+              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900">
+                      02. Complete All-Time Hospital History Register ({journalEntries.length} Records)
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Search and filter all Customer Bills, Pharmacy Sales, Supplier Medicine Bills, Lab Bills, Staff Salaries Paid, and Operating Expenses
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    <input
+                      type="text"
+                      value={historySearch}
+                      onChange={(e) => setHistorySearch(e.target.value)}
+                      placeholder="Search history by name, voucher, or date..."
+                      className="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-900 w-56"
+                    />
+                    {(
+                      [
+                        ['ALL', 'All History'],
+                        ['INVOICE', 'Customer & Lab Bills'],
+                        ['PHARMACY', 'Pharmacy Sales'],
+                        ['SUPPLIER_BILL', 'Supplier Medicine Bills'],
+                        ['PAYROLL', 'Staff Salaries Paid'],
+                        ['EXPENSE', 'Operating Expenses'],
+                      ] as const
+                    ).map(([k, label]) => (
+                      <button
+                        key={k}
+                        type="button"
+                        onClick={() => setHistoryTypeFilter(k)}
+                        className={`px-2.5 py-1.5 rounded-lg font-semibold cursor-pointer ${
+                          historyTypeFilter === k
+                            ? 'bg-[#1D5464] text-white'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto mt-3">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-500">
+                        <th className="py-2.5 font-medium">Date</th>
+                        <th className="py-2.5 font-medium">Voucher No</th>
+                        <th className="py-2.5 font-medium">Category / Department</th>
+                        <th className="py-2.5 font-medium">Description &amp; Details</th>
+                        <th className="py-2.5 font-medium text-right">Amount ({cur})</th>
+                        <th className="py-2.5 font-medium text-right">Medicine Cost (COGS)</th>
+                        <th className="py-2.5 font-medium text-right">P&amp;L Impact</th>
+                        <th className="py-2.5 font-medium text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {journalEntries
+                        .filter((j) => {
+                          const q = (historySearch || globalSearchQuery).trim().toLowerCase();
+                          if (
+                            q &&
+                            !j.narration.toLowerCase().includes(q) &&
+                            !j.voucherNo.toLowerCase().includes(q) &&
+                            !j.businessDate.toLowerCase().includes(q)
+                          ) {
+                            return false;
+                          }
+                          if (historyTypeFilter === 'INVOICE')
+                            return j.referenceType === 'INVOICE' && j.costCenter !== 'PHARMACY';
+                          if (historyTypeFilter === 'PHARMACY')
+                            return (
+                              (j.referenceType === 'INVOICE' || j.referenceType === 'REFUND') &&
+                              j.costCenter === 'PHARMACY'
+                            );
+                          if (historyTypeFilter === 'SUPPLIER_BILL')
+                            return j.referenceType === 'PURCHASE_GRN';
+                          if (historyTypeFilter === 'PAYROLL') return j.referenceType === 'PAYROLL';
+                          if (historyTypeFilter === 'EXPENSE') return j.referenceType === 'EXPENSE';
+                          return true;
+                        })
+                        .map((j) => {
+                          const isIncome = j.referenceType === 'INVOICE';
+                          const isRefund = j.referenceType === 'REFUND';
+                          const isExpenseOrPayroll =
+                            j.referenceType === 'EXPENSE' || j.referenceType === 'PAYROLL';
+                          const netImpact = isIncome
+                            ? j.amount - j.cogsAmount
+                            : isRefund
+                            ? -(j.amount - (j.cogsAmount || 0))
+                            : isExpenseOrPayroll
+                            ? -j.amount
+                            : 0;
+                          return (
+                            <tr key={j.id} className="hover:bg-slate-50">
+                              <td className="py-2.5 font-mono font-bold text-slate-900 whitespace-nowrap">
+                                {j.businessDate}
+                              </td>
+                              <td className="py-2.5 font-mono text-slate-700 whitespace-nowrap">
+                                {j.voucherNo}
+                              </td>
+                              <td className="py-2.5 font-mono text-slate-700 whitespace-nowrap">
+                                {j.costCenter} · {j.referenceType}
+                              </td>
+                              <td className="py-2.5 text-slate-900">{j.narration}</td>
+                              <td className="py-2.5 text-right font-mono tabular-nums font-bold text-slate-900">
+                                {j.amount.toLocaleString()}
+                              </td>
+                              <td className="py-2.5 text-right font-mono tabular-nums text-slate-600">
+                                {j.cogsAmount > 0 ? `-${j.cogsAmount.toLocaleString()}` : '—'}
+                              </td>
+                              <td className="py-2.5 text-right font-mono tabular-nums font-bold whitespace-nowrap">
+                                {netImpact > 0 ? (
+                                  <span className="text-emerald-700">
+                                    +{netImpact.toLocaleString()} (Profit)
+                                  </span>
+                                ) : netImpact < 0 ? (
+                                  <span className="text-rose-700">
+                                    {netImpact.toLocaleString()} (Cost/Return)
+                                  </span>
+                                ) : (
+                                  <span className="text-slate-500">Asset / Stock</span>
+                                )}
+                              </td>
+                              <td className="py-2.5 text-right whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDeleteRecord(
+                                      'journal-entry',
+                                      j.id,
+                                      `Transaction ${j.voucherNo}`
+                                    )
+                                  }
+                                  className="px-2 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded inline-flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>Delete</span>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
               <AccountingAndAiView
                 analytics={analytics}
                 journalEntries={journalEntries}
@@ -3096,12 +5793,17 @@ export default function App() {
                   setDateFilter(next);
                   fetchBootstrap(next);
                 }}
-                onAskAi={async (prompt, forceOfflineFallback) => {
+                onAskAi={async (prompt, forceOfflineFallback, useMapsGrounding, latLng) => {
                   const headers = await buildHeaders();
                   const res = await fetch('/api/ai/assistant', {
                     method: 'POST',
                     headers,
-                    body: JSON.stringify({ prompt, forceOfflineFallback }),
+                    body: JSON.stringify({
+                      prompt,
+                      forceOfflineFallback,
+                      useMapsGrounding,
+                      latLng,
+                    }),
                   });
                   return res.json();
                 }}
@@ -3146,27 +5848,31 @@ export default function App() {
               />
             </div>
           )}
+            </div>
+          </div>
+
+          {/* Printable Official Document Modal */}
+          <PrintableDocumentModal
+            docPayload={printableDoc}
+            settings={settings}
+            onClose={() => setPrintableDoc(null)}
+          />
+
+          {/* Quiet Authoritative Footer */}
+          <footer className="mt-auto border-t border-slate-200/80 bg-white px-6 py-3.5 text-xs text-slate-500">
+            <div className="max-w-[1400px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+              <div>
+                {settings.hospitalName} · Central Database &amp; Financial Management System
+              </div>
+              <div className="flex items-center gap-4">
+                <span className="font-mono text-emerald-700">
+                  Auto-Backup Active ({lastAutoSavedTime})
+                </span>
+              </div>
+            </div>
+          </footer>
         </div>
       </div>
-
-      {/* Printable Official Document Modal */}
-      <PrintableDocumentModal
-        docPayload={printableDoc}
-        settings={settings}
-        onClose={() => setPrintableDoc(null)}
-      />
-
-      {/* Quiet Authoritative Footer */}
-      <footer className="mt-auto border-t border-slate-200 bg-white px-6 py-4 text-xs text-slate-500">
-        <div className="max-w-[1440px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
-          <div>
-            {settings.hospitalName} · Single-Hospital On-Premises ERP · Central Database & Local LAN Architecture
-          </div>
-          <div className="font-semibold text-slate-900">
-            Developed by Sajjad Qaiser Shah
-          </div>
-        </div>
-      </footer>
     </div>
   );
 }

@@ -1,0 +1,40 @@
+================================================================================
+AL-HIKMAT GENERAL HOSPITAL ERP (HMS) — DEVELOPED BY SAJJAD QAISER SHAH
+MUKAMMAL CHALANE KA TAREEQA (ROMAN URDU GUIDE)
+================================================================================
+
+Step 1: Node.js Install Karein
+------------------------------
+Agar aap ke computer mein Node.js install nahi hai, to sab se pehle:
+https://nodejs.org se Node.js (LTS Version) download kar ke install kar lein.
+
+Step 2: ZIP File Extract Karein
+-------------------------------
+Is ZIP file (HMS-Sajjad-Qaiser-Shah.zip) par right-click karein aur "Extract All"
+kar ke kisi folder mein nikaal lein (maslan C:\HospitalERP).
+
+Step 3: Software Start Karne Ka Sab Se Aasan Tareeqa (Windows)
+--------------------------------------------------------------
+Folder ke andar mojood file:
+   START_SERVER_WINDOWS.bat
+par Double-Click karein!
+Yeh khud hi pehli baar "npm install" karega aur server start kar dega.
+
+(Ya agar aap CMD / Terminal se chalana chahein):
+1. Folder ke andar CMD kholein
+2. Likhein: npm install
+3. Likhein: npm run dev
+
+Step 4: Browser Mein Open Karein
+--------------------------------
+Apna Chrome ya Edge browser kholein aur yeh address likhein:
+   http://localhost:3000
+
+Hospital Ke Doosre Computers Ya Mobile Wi-Fi Par Kholne Ke Liye:
+----------------------------------------------------------------
+Main computer ka IP address (ipconfig se) dekh kar doosre computers/mobiles par likhein:
+   http://192.168.10.10:3000  (apne computer ka IP lagayein)
+
+================================================================================
+Developed by Sajjad Qaiser Shah
+================================================================================

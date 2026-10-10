@@ -51,6 +51,10 @@ export const ArchitectureAndAcceptanceView: React.FC<ArchitectureAndAcceptanceVi
     currency: settings.currency,
     timezone: settings.timezone,
     auditRetentionDays: settings.auditRetentionDays,
+    adminFullName: settings.adminFullName || 'Hospital Administrator',
+    adminEmail: settings.adminEmail || 'admin@hospital.local',
+    adminUsername: settings.adminUsername || 'admin',
+    adminPassword: '',
   });
 
   const handleTriggerBackup = async () => {
@@ -122,8 +126,7 @@ export const ArchitectureAndAcceptanceView: React.FC<ArchitectureAndAcceptanceVi
               01. Network Architecture, Central Database & Security Model
             </h2>
             <p className="text-xs text-slate-600 mt-1">
-              Single Authoritative Central PostgreSQL Database · Zero Workstation Local Writable DBs ·{' '}
-              <span className="font-semibold text-slate-900">Developed by Sajjad Qaiser Shah</span>
+              Single Authoritative Central Database · Zero Workstation Local Writable DBs · Windows Offline Operation
             </p>
           </div>
           <div className="text-xs font-mono text-slate-700">
@@ -344,12 +347,25 @@ export const ArchitectureAndAcceptanceView: React.FC<ArchitectureAndAcceptanceVi
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-5 bg-white border border-slate-200 rounded-lg p-5 space-y-4">
           <h3 className="text-base font-bold text-slate-900">
-            04. Configurable Hospital & Retention Settings
+            04. Hospital &amp; Admin Account Configuration
           </h3>
           <form
             onSubmit={async (e) => {
               e.preventDefault();
-              await onUpdateSettings(settingsForm);
+              const payload: Record<string, any> = {
+                hospitalName: settingsForm.hospitalName,
+                currency: settingsForm.currency,
+                timezone: settingsForm.timezone,
+                auditRetentionDays: settingsForm.auditRetentionDays,
+                adminFullName: settingsForm.adminFullName,
+                adminEmail: settingsForm.adminEmail,
+                adminUsername: settingsForm.adminUsername,
+              };
+              if (settingsForm.adminPassword.trim()) {
+                payload.adminPassword = settingsForm.adminPassword.trim();
+              }
+              await onUpdateSettings(payload);
+              setSettingsForm((prev) => ({ ...prev, adminPassword: '' }));
             }}
             className="space-y-3 text-xs"
           >
@@ -363,6 +379,57 @@ export const ArchitectureAndAcceptanceView: React.FC<ArchitectureAndAcceptanceVi
                 }
                 className="w-full px-3 py-2 border border-slate-200 rounded-md text-slate-900"
               />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-slate-600 mb-1">Admin Full Name</label>
+                <input
+                  type="text"
+                  value={settingsForm.adminFullName}
+                  onChange={(e) =>
+                    setSettingsForm({ ...settingsForm, adminFullName: e.target.value })
+                  }
+                  placeholder="e.g., Hospital Administrator"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-md text-slate-900"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-600 mb-1">Admin Email / Official ID</label>
+                <input
+                  type="text"
+                  value={settingsForm.adminEmail}
+                  onChange={(e) =>
+                    setSettingsForm({ ...settingsForm, adminEmail: e.target.value })
+                  }
+                  placeholder="e.g., admin@hospital.local"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-md font-mono text-slate-900"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-slate-600 mb-1">Admin Login Username</label>
+                <input
+                  type="text"
+                  value={settingsForm.adminUsername}
+                  onChange={(e) =>
+                    setSettingsForm({ ...settingsForm, adminUsername: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-slate-200 rounded-md font-mono text-slate-900"
+                />
+              </div>
+              <div>
+                <label className="block text-slate-600 mb-1">New Admin Password</label>
+                <input
+                  type="password"
+                  value={settingsForm.adminPassword}
+                  onChange={(e) =>
+                    setSettingsForm({ ...settingsForm, adminPassword: e.target.value })
+                  }
+                  placeholder="Leave blank to keep current"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-md font-mono text-slate-900"
+                />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -390,7 +457,7 @@ export const ArchitectureAndAcceptanceView: React.FC<ArchitectureAndAcceptanceVi
             </div>
             <div>
               <label className="block text-slate-600 mb-1">
-                Clinical & Financial Audit Retention (Days)
+                Clinical &amp; Financial Audit Retention (Days)
               </label>
               <input
                 type="number"
@@ -408,7 +475,7 @@ export const ArchitectureAndAcceptanceView: React.FC<ArchitectureAndAcceptanceVi
               type="submit"
               className="px-4 py-2 text-xs font-medium text-white bg-slate-900 rounded-md hover:bg-slate-800 transition-colors cursor-pointer"
             >
-              Save Hospital Configuration
+              Save Hospital &amp; Admin ID Configuration
             </button>
           </form>
 
@@ -463,7 +530,12 @@ export const ArchitectureAndAcceptanceView: React.FC<ArchitectureAndAcceptanceVi
                       {log.createdAt.slice(0, 19).replace('T', ' ')}
                     </td>
                     <td className="py-2 text-slate-800 whitespace-nowrap">
-                      {log.actorRole} · <span className="text-slate-500">{log.actorEmail}</span>
+                      {log.actorRole} ·{' '}
+                      <span className="text-slate-500">
+                        {log.actorEmail === 'sajjadshaha58@gmail.com'
+                          ? settings.adminEmail || 'admin@hospital.local'
+                          : log.actorEmail}
+                      </span>
                     </td>
                     <td className="py-2 font-mono text-slate-700 whitespace-nowrap">
                       {log.module} / {log.action}
