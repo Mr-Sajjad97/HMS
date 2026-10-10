@@ -1,0 +1,61 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Hospital staff user profile and role assignment",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "email": { "type": "string", "format": "email", "maxLength": 256 },
+        "name": { "type": "string", "maxLength": 120 },
+        "role": { "type": "string", "enum": ["ADMIN", "DOCTOR", "LAB_TECH", "PHARMACIST", "CASHIER", "ACCOUNTANT", "HR_MANAGER"] },
+        "department": { "type": "string", "maxLength": 80 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "name", "role", "department", "createdAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Immutable audit trail record for clinical, stock, and financial actions",
+      "type": "object",
+      "properties": {
+        "actorUid": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "actorEmail": { "type": "string", "maxLength": 256 },
+        "actorRole": { "type": "string", "maxLength": 40 },
+        "module": { "type": "string", "maxLength": 60 },
+        "action": { "type": "string", "maxLength": 120 },
+        "entityId": { "type": "string", "maxLength": 128 },
+        "summary": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["actorUid", "actorEmail", "actorRole", "module", "action", "entityId", "summary", "createdAt"]
+    },
+    "ErpSnapshot": {
+      "title": "ErpSnapshot",
+      "description": "Synchronized hospital ERP state checkpoint for cloud backup mirror",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "hospitalName": { "type": "string", "maxLength": 160 },
+        "version": { "type": "integer" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "hospitalName", "version", "updatedAt", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Hospital staff user profiles keyed by UID"
+    },
+    "/audit_logs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Immutable audit logs created by authenticated hospital staff"
+    },
+    "/erp_snapshots/{snapshotId}": {
+      "schema": { "$ref": "#/entities/ErpSnapshot" },
+      "description": "Hospital ERP state metadata mirrored by authorized staff"
+    }
+  }
+}
