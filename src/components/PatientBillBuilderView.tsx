@@ -23,7 +23,6 @@ import {
   CheckCircle2,
   FileText,
   RotateCcw,
-  ArrowRight,
 } from 'lucide-react';
 import type {
   Doctor,
@@ -52,7 +51,7 @@ interface PatientBillBuilderViewProps {
   onDirectHardwarePrint?: (invoice: Invoice, layout?: 'A4' | 'THERMAL_80MM') => void;
   onReturnMedicineSale: (invoice: Invoice) => void;
   onDeleteInvoice: (invoice: Invoice) => void;
-  onNavigateToPharmacyStore: () => void;
+  onNavigateToPharmacyStore?: () => void;
 }
 
 interface LabTestRow {
@@ -117,7 +116,6 @@ export const PatientBillBuilderView: React.FC<PatientBillBuilderViewProps> = ({
   onDirectHardwarePrint,
   onReturnMedicineSale,
   onDeleteInvoice,
-  onNavigateToPharmacyStore,
 }) => {
   // 1. Patient / Customer Details State (All Optional — Bill prints cleanly even if left blank)
   const [patientMode, setPatientMode] = useState<'NEW' | 'EXISTING'>('NEW');
@@ -606,33 +604,6 @@ export const PatientBillBuilderView: React.FC<PatientBillBuilderViewProps> = ({
 
   return (
     <div className="space-y-6">
-      {/* Top Info Banner Separating Full Patient Bill Builder vs Medical Store Pharmacy Counter */}
-      <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <Receipt className="w-5 h-5 text-[#1D5464]" />
-            <h1 className="text-base sm:text-lg font-bold text-slate-900">
-              Complete Patient Bill Builder (Doctor Fee + Lab Tests + Medicines + Extra Drip / Injection)
-            </h1>
-          </div>
-          <p className="text-xs text-slate-600">
-            Create a complete customized patient bill with Patient Details, Doctor Fee, Lab Tests, Medicines (auto-deducted from Stock), and Extra Items (Drip, Injection, Bed, etc.). Automatically deducts from Home Calculation &amp; Stock, prints on Connected Printer, or generates a Virtual Bill if no printer is connected.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={onNavigateToPharmacyStore}
-            className="px-3.5 py-2 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
-            title="Switch to separate Medical Store Counter for customers who only buy medicines"
-          >
-            <Pill className="w-3.5 h-3.5 text-[#1D5464]" />
-            <span>Medical Store Only (Separate Pharmacy POS)</span>
-            <ArrowRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-
       {/* Main Patient Bill Builder Grid */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
         {/* LEFT 8 COLUMNS: CUSTOMIZABLE PATIENT BILL FORM */}

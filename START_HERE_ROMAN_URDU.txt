@@ -1,39 +1,51 @@
 ================================================================================
 AL-HIKMAT GENERAL HOSPITAL ERP (HMS) — DEVELOPED BY SAJJAD QAISER SHAH
-MUKAMMAL CHALANE KA TAREEQA (ROMAN URDU GUIDE)
+USER KO DENE AUR WINDOWS DESKTOP PAR CHALANE KA MUKAMMAL TAREEQA
 ================================================================================
 
-Step 1: Node.js Install Karein
-------------------------------
-Agar aap ke computer mein Node.js install nahi hai, to sab se pehle:
-https://nodejs.org se Node.js (LTS Version) download kar ke install kar lein.
+Step 1: Node.js Install Karein (Sirf Aik Baar)
+----------------------------------------------
+Jis computer/laptop par software chalana ho, us par Node.js install karein:
+https://nodejs.org (LTS Version download kar ke Next -> Next -> Install kar lein).
 
-Step 2: ZIP File Extract Karein
--------------------------------
-Is ZIP file (HMS-Sajjad-Qaiser-Shah.zip) par right-click karein aur "Extract All"
-kar ke kisi folder mein nikaal lein (maslan C:\HospitalERP).
+Step 2: ZIP File Laptop Mein Extract Karein
+-------------------------------------------
+Download ki gayi ZIP file (HMS-Al-Hikmat-Hospital-ERP-Sajjad-Qaiser-Shah.zip)
+par right-click karein aur "Extract All" kar ke Laptop ke kisi folder mein rakh lein
+(maslan: C:\AlHikmatHospitalERP ya D:\AlHikmatHospitalERP).
 
-Step 3: Software Start Karne Ka Sab Se Aasan Tareeqa (Windows)
---------------------------------------------------------------
+Step 3: Windows Desktop Par Icon Banayein (1-Click)
+---------------------------------------------------
 Folder ke andar mojood file:
-   START_SERVER_WINDOWS.bat
+   CREATE_DESKTOP_SHORTCUT_WINDOWS.bat
 par Double-Click karein!
-Yeh khud hi pehli baar "npm install" karega aur server start kar dega.
+Is se aap ke Windows Desktop ke upar "Al-Hikmat Hospital ERP" ka icon ban jayega.
 
-(Ya agar aap CMD / Terminal se chalana chahein):
-1. Folder ke andar CMD kholein
-2. Likhein: npm install
-3. Likhein: npm run dev
+Step 4: Desktop Window Mein Software Chalayein
+----------------------------------------------
+Ab apne Windows Desktop par bane hue "Al-Hikmat Hospital ERP" icon
+(ya folder ke andar START_SERVER_WINDOWS.bat) par Double-Click karein!
+- Pehli baar yeh khud packages install karega.
+- Aur phir khud hi Software ko aik alag WINDOWS DESKTOP APP WINDOW mein khol dega!
 
-Step 4: Browser Mein Open Karein
---------------------------------
-Apna Chrome ya Edge browser kholein aur yeh address likhein:
-   http://localhost:3000
+Step 5: Laptop Ki Files Mein Data Kahan Save Hota Hai? (Automatic Save)
+-----------------------------------------------------------------------
+Software mein aap jo bhi Patient Bill, Medicine Stock, Lab Test, Staff Hazri,
+Salary ya Expense enter karte hain, woh AUTOMATICALLY aap ke Laptop ke andar
+is folder mein save hota rehta hai:
 
-Hospital Ke Doosre Computers Ya Mobile Wi-Fi Par Kholne Ke Liye:
-----------------------------------------------------------------
-Main computer ka IP address (ipconfig se) dekh kar doosre computers/mobiles par likhein:
-   http://192.168.10.10:3000  (apne computer ka IP lagayein)
+1. Mukammal Database File:
+   data\central_hospital_db.json
+
+2. Automatic Backups & Excel History Files (Har Entry Par Khud Update Hoti Hain):
+   data\Laptop_Auto_Backups\Al_Hikmat_Auto_Backup_Latest.json
+   data\Laptop_Auto_Backups\Al_Hikmat_Master_History.csv (Excel File)
+   data\Laptop_Auto_Backups\Al_Hikmat_Patient_Bills_History.csv (Excel File)
+   data\Laptop_Auto_Backups\Al_Hikmat_Staff_Attendance_History.csv (Excel File)
+
+3. Custom Laptop Folder Link:
+   Software ke andar "History & Backups" menu mein ja kar "Link Laptop Folder for Auto-Save"
+   par click kar ke aap Desktop ya D: Drive ka koi bhi apna folder bhi select kar sakte hain!
 
 ================================================================================
 Developed by Sajjad Qaiser Shah

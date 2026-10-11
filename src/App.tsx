@@ -2694,13 +2694,6 @@ export default function App() {
                 <span>{showSidebarInFullScreen ? 'Hide Menu' : 'Show Menu'}</span>
               </button>
             )}
-            <div
-              className={`text-xs sm:text-sm font-bold truncate ${
-                isModuleFullScreen || isAppFullScreen ? 'text-white' : 'text-slate-900'
-              }`}
-            >
-              {getModuleMeta(activeModule).label}
-            </div>
             {(isModuleFullScreen || isAppFullScreen) && (
               <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-300/30 text-emerald-100 text-[10px] font-bold">
                 FULL SCREEN MODE
@@ -3091,7 +3084,6 @@ export default function App() {
                   onDeleteInvoice={(inv) =>
                     handleDeleteRecord('invoice', inv.id, `Patient Bill ${inv.invoiceNo}`)
                   }
-                  onNavigateToPharmacyStore={() => navigateToOption('pharmacy')}
                 />
               )}
 
@@ -4631,15 +4623,7 @@ export default function App() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
-                    Separate counter for customers buying ONLY medicines from the Medical Store. For full Hospital Patient Bills (Doctor Fee + Lab Test + Medicine + Drip/Injection), use{' '}
-                    <button
-                      type="button"
-                      onClick={() => navigateToOption('patient_billing')}
-                      className="text-[#1D5464] font-bold underline cursor-pointer"
-                    >
-                      Make Patient Bill
-                    </button>
-                    .
+                    Separate counter for customers buying ONLY medicines from the Medical Store. Automatically deducts from Pharmacy Stock.
                   </p>
 
                   <form onSubmit={handleCheckoutPos} className="mt-4 space-y-3 text-xs">
@@ -6616,6 +6600,15 @@ export default function App() {
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2.5 text-xs">
+                    <a
+                      href="/api/export/project-zip"
+                      download
+                      className="px-3.5 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold flex items-center gap-1.5 cursor-pointer shadow-xs"
+                      title="Download full Windows Desktop Software ZIP with Desktop Icon Creator & Local Laptop Database"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Download Windows Desktop App (.ZIP)</span>
+                    </a>
                     <button
                       type="button"
                       onClick={handleLinkLaptopFolder}
