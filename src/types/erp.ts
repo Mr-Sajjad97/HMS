@@ -155,12 +155,19 @@ export interface InvoiceLineItem {
   unitCost: number;
   lineTotal: number;
   batchId?: string;
+  category?: 'DOCTOR_FEE' | 'LAB_TEST' | 'MEDICINE' | 'EXTRA_CUSTOM' | 'SERVICE';
 }
 
 export interface Invoice {
   id: string;
   invoiceNo: string;
   patientId?: string;
+  patientMrn?: string;
+  patientAge?: number;
+  patientGender?: 'Male' | 'Female' | 'Other';
+  patientPhone?: string;
+  patientAddress?: string;
+  doctorName?: string;
   customerName: string;
   department: 'HOSPITAL_OPD' | 'HOSPITAL_IPD' | 'LABORATORY' | 'PHARMACY_RETAIL' | 'PHARMACY_WHOLESALE';
   items: InvoiceLineItem[];
@@ -175,6 +182,11 @@ export interface Invoice {
   paymentDate: string | null;
   createdAt: string;
   finalized: boolean;
+  isCombinedPatientBill?: boolean;
+  isVirtualBill?: boolean;
+  homeCalculationMode?: 'DEDUCT_BILL_FROM_HOME' | 'STANDARD_REVENUE_AND_DEDUCT_COST';
+  totalCogsDeducted?: number;
+  homeDeductionAmount?: number;
 }
 
 export interface JournalEntry {
@@ -251,6 +263,21 @@ export interface SalarySlip {
   businessDate: string;
   paymentDate: string;
   createdAt: string;
+}
+
+export interface StaffAttendanceRecord {
+  id: string;
+  employeeId: string;
+  empCode: string;
+  employeeName: string;
+  designation: string;
+  department: 'HOSPITAL' | 'LABORATORY' | 'PHARMACY' | 'SHARED_ADMIN';
+  date: string; // YYYY-MM-DD
+  month: string; // YYYY-MM
+  status: 'PRESENT' | 'ABSENT' | 'LEAVE';
+  remarks?: string;
+  recordedBy: string;
+  updatedAt: string;
 }
 
 export interface AuditLogEntry {

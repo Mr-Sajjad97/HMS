@@ -375,7 +375,20 @@ HTML_PAGE = """<!DOCTYPE html>
     </div>
     <div class="p-4 border-t border-white/10 space-y-2 text-xs">
       <div class="px-3 py-2 rounded-lg bg-white/10 text-teal-100 text-[11px] text-center">✓ All Changes Auto-Saved</div>
-      <button onclick="lockApp()" class="w-full py-2 px-3 rounded-lg bg-rose-600 text-white font-semibold cursor-pointer">Login / Logout (PIN)</button>
+      <button onclick="lockApp()" class="w-full py-2 px-3 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-semibold cursor-pointer">Login / Logout (PIN)</button>
+      <button onclick="document.getElementById('change-pin-modal').classList.remove('hidden')" class="w-full py-2 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold cursor-pointer">Change PIN (••••)</button>
+      <div class="p-2.5 rounded-lg bg-white/10 border border-white/10 text-left space-y-1">
+        <div class="text-xs font-bold text-white">Hospital Administrator</div>
+        <select class="w-full text-[11px] text-teal-100 bg-[#16424F] border border-white/15 rounded px-1.5 py-1 font-medium cursor-pointer">
+          <option value="ADMIN">Admin (Hospital Administrator)</option>
+          <option value="PHARMACIST">Pharmacist</option>
+          <option value="CASHIER">Cashier</option>
+          <option value="LAB_TECH">Lab Tech</option>
+          <option value="DOCTOR">Doctor</option>
+          <option value="NURSE">Nurse</option>
+          <option value="OTHER">Other Staff</option>
+        </select>
+      </div>
       <div class="pt-2 border-t border-white/10 text-[11px] text-teal-200 font-semibold text-center">
         Developed by Sajjad Qaiser Shah
       </div>
@@ -399,10 +412,6 @@ HTML_PAGE = """<!DOCTYPE html>
 
     <header class="bg-white border-b border-slate-200 px-6 py-3 shrink-0 flex flex-wrap items-center justify-between gap-4">
       <div class="text-sm font-bold text-slate-800">Al-Hikmat General Hospital</div>
-      <div class="flex flex-wrap items-center gap-2 text-xs">
-        <button onclick="document.getElementById('change-pin-modal').classList.remove('hidden')" class="px-3 py-1.5 rounded bg-slate-100 font-mono font-bold text-[#1D5464] cursor-pointer">Change PIN (••••)</button>
-        <button onclick="lockApp()" class="px-3 py-1.5 rounded bg-rose-600 text-white font-bold cursor-pointer">Login / Logout</button>
-      </div>
     </header>
 
     <main id="main-content-container" class="flex-1 overflow-y-auto p-6 space-y-6 max-w-7xl w-full mx-auto">

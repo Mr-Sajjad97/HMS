@@ -28,6 +28,7 @@ import type {
   ExpenseRecord,
   Employee,
   SalarySlip,
+  StaffAttendanceRecord,
   AuditLogEntry,
   BackupRecord,
   SupplierBill,
@@ -70,6 +71,7 @@ interface CentralDatabaseState {
   expenses: ExpenseRecord[];
   employees: Employee[];
   salarySlips: SalarySlip[];
+  staffAttendance?: StaffAttendanceRecord[];
   supplierBills?: SupplierBill[];
   auditLogs: AuditLogEntry[];
   backups: BackupRecord[];
@@ -1041,6 +1043,7 @@ function createInitialState(): CentralDatabaseState {
     expenses,
     employees,
     salarySlips,
+    staffAttendance: createSeedStaffAttendance(employees),
     supplierBills: [
       {
         id: 'SBILL-1001',
@@ -1116,6 +1119,72 @@ function createInitialState(): CentralDatabaseState {
   baseState.backups.push(initialBackup);
 
   return baseState;
+}
+
+function createSeedStaffAttendance(employees: Employee[]): StaffAttendanceRecord[] {
+  const records: StaffAttendanceRecord[] = [];
+  const datesAndStatuses: Array<{
+    date: string;
+    absentEmpCodes: string[];
+    remarksByCode?: Record<string, string>;
+  }> = [
+    {
+      date: '2026-09-14',
+      absentEmpCodes: ['STF-102'],
+      remarksByCode: { 'STF-102': 'Family urgency leave (1 Chutti)' },
+    },
+    {
+      date: '2026-09-22',
+      absentEmpCodes: ['STF-103', 'STF-104'],
+      remarksByCode: {
+        'STF-103': 'Medical leave (Chutti)',
+        'STF-104': 'Personal leave (Chutti)',
+      },
+    },
+    {
+      date: '2026-09-28',
+      absentEmpCodes: ['STF-102'],
+      remarksByCode: { 'STF-102': 'Casual leave (Chutti)' },
+    },
+    {
+      date: '2026-10-08',
+      absentEmpCodes: ['STF-104'],
+      remarksByCode: { 'STF-104': 'Absent / Personal Chutti' },
+    },
+    {
+      date: '2026-10-09',
+      absentEmpCodes: ['STF-103'],
+      remarksByCode: { 'STF-103': 'Absent / Family work' },
+    },
+    {
+      date: '2026-10-10',
+      absentEmpCodes: [],
+      remarksByCode: {},
+    },
+  ];
+
+  for (const day of datesAndStatuses) {
+    for (const emp of employees) {
+      const isAbsent = day.absentEmpCodes.includes(emp.empCode);
+      records.push({
+        id: `ATT-${day.date}-${emp.id}`,
+        employeeId: emp.id,
+        empCode: emp.empCode,
+        employeeName: emp.fullName,
+        designation: emp.designation,
+        department: emp.department,
+        date: day.date,
+        month: day.date.slice(0, 7),
+        status: isAbsent ? 'ABSENT' : 'PRESENT',
+        remarks: isAbsent
+          ? day.remarksByCode?.[emp.empCode] || 'Absent (Ghair Hazir)'
+          : 'Present on duty (Hazir)',
+        recordedBy: 'admin@hospital.local',
+        updatedAt: `${day.date}T08:30:00.000Z`,
+      });
+    }
+  }
+  return records.sort((a, b) => b.date.localeCompare(a.date));
 }
 
 function createSeedVitals(): VitalSignEntry[] {
@@ -1705,6 +1774,34 @@ function loadState(): CentralDatabaseState {
         ];
         mutated = true;
       }
+      if (!parsed.staffAttendance || parsed.staffAttendance.length === 0) {
+        parsed.staffAttendance = createSeedStaffAttendance(parsed.employees || []);
+        mutated = true;
+      } else {
+        // Ensure all current employees have attendance records for seeded dates including 2026-10-10
+        for (const emp of parsed.employees || []) {
+          const hasToday = parsed.staffAttendance.some(
+            (a) => a.employeeId === emp.id && a.date === '2026-10-10'
+          );
+          if (!hasToday) {
+            parsed.staffAttendance.unshift({
+              id: `ATT-2026-10-10-${emp.id}`,
+              employeeId: emp.id,
+              empCode: emp.empCode,
+              employeeName: emp.fullName,
+              designation: emp.designation,
+              department: emp.department,
+              date: '2026-10-10',
+              month: '2026-10',
+              status: 'PRESENT',
+              remarks: 'Present on duty (Hazir)',
+              recordedBy: 'admin@hospital.local',
+              updatedAt: new Date().toISOString(),
+            });
+            mutated = true;
+          }
+        }
+      }
       if (mutated) {
         saveState(parsed);
       }
@@ -1809,6 +1906,88 @@ function saveState(state: CentralDatabaseState): void {
           escapeCsv(je.createdBy),
           escapeCsv(je.createdAt),
         ].join(',')
+      );
+    }
+
+    // Also append Staff Attendance History rows to the Master History CSV & save dedicated Staff Attendance CSV
+    if (Array.isArray(state.staffAttendance) && state.staffAttendance.length > 0) {
+      const attCsvRows: string[] = [
+        'Date,Month,Staff_Code,Staff_Name,Designation,Department,Attendance_Status,Remarks,Recorded_By,Updated_At',
+      ];
+      for (const att of state.staffAttendance) {
+        attCsvRows.push(
+          [
+            escapeCsv(att.date),
+            escapeCsv(att.month),
+            escapeCsv(att.empCode),
+            escapeCsv(att.employeeName),
+            escapeCsv(att.designation),
+            escapeCsv(att.department),
+            escapeCsv(att.status),
+            escapeCsv(att.remarks || ''),
+            escapeCsv(att.recordedBy),
+            escapeCsv(att.updatedAt),
+          ].join(',')
+        );
+        csvRows.push(
+          [
+            escapeCsv(att.date),
+            escapeCsv(`ATT-${att.empCode}`),
+            escapeCsv(`STAFF_ATTENDANCE_${att.status}`),
+            escapeCsv(att.department),
+            escapeCsv(
+              `Staff Attendance (${att.date}): ${att.employeeName} (${att.designation}) — ${att.status} (${att.remarks || ''})`
+            ),
+            0,
+            0,
+            0,
+            escapeCsv(att.recordedBy),
+            escapeCsv(att.updatedAt),
+          ].join(',')
+        );
+      }
+      fs.writeFileSync(
+        path.join(autoBackupDir, 'Al_Hikmat_Staff_Attendance_History.csv'),
+        attCsvRows.join('\n'),
+        'utf8'
+      );
+    }
+
+    // Also save dedicated Patient Bills & Date-Wise Total Patients History CSV
+    if (Array.isArray(state.invoices) && state.invoices.length > 0) {
+      const billCsvRows: string[] = [
+        'Date,Bill_No,Patient_Or_Customer,MRN,Age,Gender,Phone,Doctor,Department,Itemized_Details,Subtotal,Discount,Total_Bill,Paid_Amount,Status,Mode,Created_At',
+      ];
+      for (const inv of state.invoices) {
+        const itemsText = inv.items
+          .map((it) => `${it.qty}x ${it.description} (${it.lineTotal})`)
+          .join(' | ');
+        billCsvRows.push(
+          [
+            escapeCsv(inv.businessDate),
+            escapeCsv(inv.invoiceNo),
+            escapeCsv(inv.customerName),
+            escapeCsv(inv.patientMrn || ''),
+            inv.patientAge || '',
+            escapeCsv(inv.patientGender || ''),
+            escapeCsv(inv.patientPhone || ''),
+            escapeCsv(inv.doctorName || ''),
+            escapeCsv(inv.department),
+            escapeCsv(itemsText),
+            inv.subtotal,
+            inv.discount,
+            inv.netTotal,
+            inv.paidAmount,
+            escapeCsv(inv.status),
+            escapeCsv(inv.isVirtualBill ? 'VIRTUAL_AND_PRINT_READY' : 'STANDARD'),
+            escapeCsv(inv.createdAt),
+          ].join(',')
+        );
+      }
+      fs.writeFileSync(
+        path.join(autoBackupDir, 'Al_Hikmat_Patient_Bills_History.csv'),
+        billCsvRows.join('\n'),
+        'utf8'
       );
     }
 
@@ -3178,6 +3357,468 @@ async function startServer() {
     }
   });
 
+  // 10b. Create Complete Customizable Patient Bill (Customer Detail + Doctor Fee + Lab Tests + Medicines from Stock + Extra Drip/Injection + Home Calculation & Stock Deduction + Virtual/Printer Bill)
+  app.post('/api/billing/patient-combined-bill', async (req, res) => {
+    const actor = await resolveActor(req);
+    try {
+      const result = await runAtomicTransaction(() => {
+        const {
+          patientMode,
+          patientId,
+          customerName,
+          patientAge,
+          patientGender,
+          patientPhone,
+          patientCnic,
+          patientAddress,
+          chiefComplaint,
+          businessDate,
+          department,
+          includeDoctorFee,
+          doctorId,
+          doctorName,
+          doctorFee,
+          labItems,
+          medicineItems,
+          extraItems,
+          discount,
+          paidAmount,
+          paymentMethod,
+          homeCalculationMode,
+          isVirtualBill,
+        } = req.body;
+
+        const nowIso = new Date().toISOString();
+        const bDate = String(businessDate || nowIso.slice(0, 10)).trim();
+        const dept = department === 'HOSPITAL_IPD' ? 'HOSPITAL_IPD' : 'HOSPITAL_OPD';
+        const safeMedItems = Array.isArray(medicineItems) ? medicineItems : [];
+        const safeLabItems = Array.isArray(labItems) ? labItems : [];
+        const safeExtraItems = Array.isArray(extraItems) ? extraItems : [];
+
+        // Phase 1: Validate all pharmacy stock medicine items BEFORE mutating any stock
+        for (const medReq of safeMedItems) {
+          const qty = Math.max(1, Number(medReq.qty) || 1);
+          const batch = dbState.pharmacyBatches.find((b) => b.id === medReq.batchId);
+          if (!batch) {
+            throw new Error(`Selected medicine batch (${medReq.batchId}) was not found in stock.`);
+          }
+          if (batch.expiryDate < bDate) {
+            throw new Error(
+              `SAFETY BLOCK: Medicine ${batch.brandName} [Batch ${batch.batchNo}] expired on ${batch.expiryDate}.`
+            );
+          }
+          if (batch.stockQty < qty) {
+            throw new Error(
+              `INSUFFICIENT STOCK: ${batch.brandName} [Batch ${batch.batchNo}] has ${batch.stockQty} available, requested ${qty}.`
+            );
+          }
+        }
+
+        // Phase 2: Find or Register Patient so Date-Wise Total Patients History updates automatically
+        let patient: Patient | undefined =
+          patientMode === 'EXISTING' && patientId
+            ? dbState.patients.find((p) => p.id === patientId)
+            : undefined;
+
+        const resolvedPatientName =
+          String(customerName || patient?.fullName || '').trim() ||
+          'Walk-in Patient / Customer';
+
+        const rawPhone = String(patientPhone || '').trim();
+        const cleanPhone =
+          rawPhone && rawPhone !== '+92-300-' && rawPhone !== 'N/A' ? rawPhone : '';
+        const rawCnic = String(patientCnic || '').trim();
+        const cleanCnic =
+          rawCnic && rawCnic !== '35202-' && rawCnic !== 'N/A' ? rawCnic : '';
+        const cleanAddress = String(patientAddress || chiefComplaint || '').trim();
+        const parsedAge = Number(patientAge) > 0 ? Number(patientAge) : undefined;
+        const cleanGender =
+          patientGender === 'Male' || patientGender === 'Female' || patientGender === 'Other'
+            ? patientGender
+            : undefined;
+
+        if (!patient) {
+          const seq = dbState.patients.length + 1;
+          patient = {
+            id: `PAT-${Date.now()}`,
+            mrn: `MRN-2026-${String(seq).padStart(4, '0')}`,
+            fullName: resolvedPatientName,
+            age: parsedAge || 0,
+            gender: cleanGender || 'Male',
+            phone: cleanPhone || 'N/A',
+            cnic: cleanCnic || 'N/A',
+            bloodGroup: 'O+',
+            address: cleanAddress || 'N/A',
+            allergies: 'None',
+            registeredBusinessDate: bDate,
+            createdAt: nowIso,
+          };
+          dbState.patients.unshift(patient);
+        }
+
+        const docObj =
+          dbState.doctors.find((d) => d.id === doctorId) ||
+          dbState.doctors[0] || {
+            id: 'DOC-01',
+            fullName: String(doctorName || 'Duty Medical Officer').trim(),
+            specialization: 'General Medicine',
+            department: 'OPD',
+            consultationFee: 2000,
+            roomNo: 'OPD-101',
+            onDuty: true,
+          };
+        const resolvedDocName = String(doctorName || docObj.fullName).trim();
+
+        // Phase 3: Build itemized invoice lines and deduct stock for medicines
+        const invoiceItems: Invoice['items'] = [];
+        let subtotal = 0;
+        let hospitalRevPart = 0;
+        let labRevPart = 0;
+        let pharmacyRevPart = 0;
+        let totalMedicineCogs = 0;
+        let totalExtraAndLabCost = 0;
+
+        // 3a. Doctor Fee Line
+        const docFeeAmt = includeDoctorFee ? Math.max(0, Number(doctorFee) || 0) : 0;
+        if (includeDoctorFee && docFeeAmt >= 0) {
+          invoiceItems.push({
+            description: `Doctor Consultation Fee — ${resolvedDocName}`,
+            qty: 1,
+            unitPrice: docFeeAmt,
+            unitCost: 0,
+            lineTotal: docFeeAmt,
+            category: 'DOCTOR_FEE',
+          });
+          subtotal += docFeeAmt;
+          hospitalRevPart += docFeeAmt;
+        }
+
+        // 3b. Lab Tests Lines
+        for (const lItem of safeLabItems) {
+          const tName = String(lItem.testName || '').trim() || 'Diagnostic Lab Test';
+          const lQty = Math.max(1, Number(lItem.qty) || 1);
+          const lPrice = Math.max(0, Number(lItem.price) || 0);
+          const lCost = Math.max(0, Number(lItem.unitCost) || 0);
+          const lTotal = lQty * lPrice;
+          invoiceItems.push({
+            description: `Lab Test: ${tName}`,
+            qty: lQty,
+            unitPrice: lPrice,
+            unitCost: lCost,
+            lineTotal: lTotal,
+            category: 'LAB_TEST',
+          });
+          subtotal += lTotal;
+          labRevPart += lTotal;
+          totalExtraAndLabCost += lQty * lCost;
+        }
+
+        // 3c. Medicines from Pharmacy Stock (Deduct Stock + Track COGS)
+        for (const mItem of safeMedItems) {
+          const batch = dbState.pharmacyBatches.find((b) => b.id === mItem.batchId)!;
+          const mQty = Math.max(1, Number(mItem.qty) || 1);
+          const mPrice =
+            mItem.unitPrice !== undefined && Number(mItem.unitPrice) >= 0
+              ? Number(mItem.unitPrice)
+              : batch.retailPrice;
+          const mTotal = mQty * mPrice;
+          const mCogs = mQty * batch.unitCost;
+
+          // Deduct from Pharmacy Stock
+          batch.stockQty -= mQty;
+          batch.updatedAt = nowIso;
+
+          invoiceItems.push({
+            description: `Medicine: ${batch.brandName} [Batch ${batch.batchNo}]`,
+            qty: mQty,
+            unitPrice: mPrice,
+            unitCost: batch.unitCost,
+            lineTotal: mTotal,
+            batchId: batch.id,
+            category: 'MEDICINE',
+          });
+          subtotal += mTotal;
+          pharmacyRevPart += mTotal;
+          totalMedicineCogs += mCogs;
+        }
+
+        // 3d. Extra Custom Clinical Items (Drip, Injection, Bed, Cannula, Dressing, etc.)
+        for (const exItem of safeExtraItems) {
+          const exDesc = String(exItem.description || '').trim();
+          const exPrice = Math.max(0, Number(exItem.unitPrice) || 0);
+          if (!exDesc && exPrice <= 0) continue;
+          const exQty = Math.max(1, Number(exItem.qty) || 1);
+          const exCost = Math.max(0, Number(exItem.unitCost) || 0);
+          const exTotal = exQty * exPrice;
+          invoiceItems.push({
+            description: exDesc || 'Extra Clinical Item (Drip / Injection)',
+            qty: exQty,
+            unitPrice: exPrice,
+            unitCost: exCost,
+            lineTotal: exTotal,
+            category: 'EXTRA_CUSTOM',
+          });
+          subtotal += exTotal;
+          hospitalRevPart += exTotal;
+          totalExtraAndLabCost += exQty * exCost;
+        }
+
+        if (invoiceItems.length === 0) {
+          invoiceItems.push({
+            description:
+              String(chiefComplaint || '').trim() ||
+              'General Hospital Consultation / Slip',
+            qty: 1,
+            unitPrice: 0,
+            unitCost: 0,
+            lineTotal: 0,
+            category: 'SERVICE',
+          });
+        }
+
+        const disc = Math.min(subtotal, Math.max(0, Number(discount) || 0));
+        const netTotal = Math.max(0, subtotal - disc);
+        const paid =
+          paidAmount !== undefined && paidAmount !== ''
+            ? Math.min(netTotal, Math.max(0, Number(paidAmount)))
+            : paymentMethod === 'CREDIT_LEDGER'
+            ? 0
+            : netTotal;
+
+        const calcMode: 'DEDUCT_BILL_FROM_HOME' | 'STANDARD_REVENUE_AND_DEDUCT_COST' =
+          homeCalculationMode === 'STANDARD_REVENUE_AND_DEDUCT_COST'
+            ? 'STANDARD_REVENUE_AND_DEDUCT_COST'
+            : 'DEDUCT_BILL_FROM_HOME';
+
+        const invSeq = dbState.invoices.length + 1;
+        const invoice: Invoice = {
+          id: `INV-${Date.now()}`,
+          invoiceNo: `INV-2026-${String(invSeq).padStart(4, '0')}`,
+          patientId: patient.id,
+          patientMrn: patient.mrn,
+          patientAge:
+            patientMode === 'EXISTING' && patient.age > 0 ? patient.age : parsedAge,
+          patientGender:
+            patientMode === 'EXISTING' ? patient.gender : cleanGender,
+          patientPhone:
+            patientMode === 'EXISTING' && patient.phone !== 'N/A'
+              ? patient.phone
+              : cleanPhone || undefined,
+          patientAddress:
+            patientMode === 'EXISTING' && patient.address !== 'N/A'
+              ? patient.address
+              : cleanAddress || undefined,
+          doctorName: includeDoctorFee ? resolvedDocName : undefined,
+          customerName: patient.fullName,
+          department: dept,
+          items: invoiceItems,
+          subtotal,
+          discount: disc,
+          netTotal,
+          paidAmount: paid,
+          refundedAmount: 0,
+          paymentMethod: paymentMethod || 'CASH',
+          status: paid >= netTotal ? 'PAID' : paid > 0 ? 'PARTIAL' : 'UNPAID',
+          businessDate: bDate,
+          paymentDate: paid > 0 ? bDate : null,
+          createdAt: nowIso,
+          finalized: true,
+          isCombinedPatientBill: true,
+          isVirtualBill: isVirtualBill !== false,
+          homeCalculationMode: calcMode,
+          totalCogsDeducted: totalMedicineCogs + totalExtraAndLabCost,
+          homeDeductionAmount:
+            calcMode === 'DEDUCT_BILL_FROM_HOME'
+              ? netTotal
+              : totalMedicineCogs + totalExtraAndLabCost,
+        };
+
+        dbState.invoices.unshift(invoice);
+
+        // Create clinical Encounter if Doctor Consultation was included
+        if (includeDoctorFee) {
+          const enc: Encounter = {
+            id: `ENC-${Date.now()}`,
+            tokenNo: `TKN-${String(dbState.encounters.length + 101)}`,
+            patientId: patient.id,
+            patientName: patient.fullName,
+            patientMrn: patient.mrn,
+            doctorId: docObj.id,
+            doctorName: resolvedDocName,
+            department: docObj.department,
+            encounterType: dept === 'HOSPITAL_IPD' ? 'IPD' : 'OPD',
+            status: dept === 'HOSPITAL_IPD' ? 'ADMITTED' : 'COMPLETED',
+            wardBed: dept === 'HOSPITAL_IPD' ? 'IPD Ward' : docObj.roomNo || 'OPD-101',
+            chiefComplaint: String(chiefComplaint || 'OPD Consultation & Bill').trim(),
+            diagnosis: 'Clinical Evaluation & Treatment',
+            vitals: 'Recorded on Bill',
+            fee: docFeeAmt,
+            invoiceId: invoice.id,
+            businessDate: bDate,
+            createdAt: nowIso,
+          };
+          dbState.encounters.unshift(enc);
+        }
+
+        // Create LabOrder records for each lab test included on the bill
+        for (let i = 0; i < safeLabItems.length; i++) {
+          const lItem = safeLabItems[i];
+          const barcode = `SMP-${bDate.replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+          const labOrder: LabOrder = {
+            id: `LAB-${Date.now()}-${i}`,
+            orderNo: `LBO-2026-${String(dbState.labOrders.length + 1).padStart(2, '0')}`,
+            patientId: patient.id,
+            patientName: patient.fullName,
+            patientMrn: patient.mrn,
+            doctorId: docObj.id,
+            doctorName: resolvedDocName,
+            testCode: lItem.testCode || 'LAB-GEN',
+            testName: String(lItem.testName || 'Diagnostic Lab Test').trim(),
+            category: (lItem.category as any) || 'Biochemistry',
+            sampleBarcode: barcode,
+            status: 'ORDERED',
+            resultValue: '',
+            unit: 'mg/dL',
+            referenceRange: 'Standard Reference Interval',
+            abnormalFlag: 'NORMAL',
+            price: Math.max(0, Number(lItem.price) || 0) * Math.max(1, Number(lItem.qty) || 1),
+            invoiceId: invoice.id,
+            businessDate: bDate,
+            createdAt: nowIso,
+          };
+          dbState.labOrders.unshift(labOrder);
+        }
+
+        // Phase 4: Record Journal Entries for Home Dashboard Calculation
+        if (calcMode === 'DEDUCT_BILL_FROM_HOME') {
+          // User explicitly requested: "proper patients ka bill banai ju home calculation sy deduct hu aor stack sy b wo deduct hu"
+          const jeSeq = dbState.journalEntries.length + 1;
+          const deductionJe: JournalEntry = {
+            id: `JRN-${Date.now()}-DED`,
+            voucherNo: `JV-2026-${String(jeSeq).padStart(4, '0')}`,
+            businessDate: bDate,
+            paymentDate: paid > 0 ? bDate : null,
+            createdAt: nowIso,
+            costCenter: 'HOSPITAL',
+            isInternalTransfer: false,
+            referenceType: 'EXPENSE',
+            referenceId: invoice.id,
+            narration: `Patient Bill Deducted from Home Calculation (${invoice.invoiceNo}) — ${patient.fullName}: ${invoiceItems
+              .map((it) => `${it.qty}x ${it.description}`)
+              .join(', ')}`,
+            debitAccount: '5100 · Patient Bill Home Calculation Deduction',
+            creditAccount: '1010 · Cash / Stock Settlement',
+            amount: netTotal,
+            cogsAmount: totalMedicineCogs,
+            createdBy: actor.email,
+          };
+          dbState.journalEntries.unshift(deductionJe);
+        } else {
+          // Standard Revenue + Deduct Stock Cost (COGS) & Extra Consumable Cost from Home Calculation
+          const ratio = subtotal > 0 ? netTotal / subtotal : 1;
+          const netHosp = Math.round(hospitalRevPart * ratio);
+          const netLab = Math.round(labRevPart * ratio);
+          const netPharm = Math.max(0, netTotal - netHosp - netLab);
+
+          if (netHosp > 0) {
+            const jeSeq = dbState.journalEntries.length + 1;
+            dbState.journalEntries.unshift({
+              id: `JRN-${Date.now()}-H`,
+              voucherNo: `JV-2026-${String(jeSeq).padStart(4, '0')}`,
+              businessDate: bDate,
+              paymentDate: paid > 0 ? bDate : null,
+              createdAt: nowIso,
+              costCenter: 'HOSPITAL',
+              isInternalTransfer: false,
+              referenceType: 'INVOICE',
+              referenceId: invoice.id,
+              narration: `Patient Bill Hospital Services (${invoice.invoiceNo}) — ${patient.fullName}`,
+              debitAccount: '1010 · Cash in Hand',
+              creditAccount: '4010 · Hospital Clinical Revenue',
+              amount: netHosp,
+              cogsAmount: 0,
+              createdBy: actor.email,
+            });
+          }
+          if (netLab > 0) {
+            const jeSeq = dbState.journalEntries.length + 1;
+            dbState.journalEntries.unshift({
+              id: `JRN-${Date.now()}-L`,
+              voucherNo: `JV-2026-${String(jeSeq).padStart(4, '0')}`,
+              businessDate: bDate,
+              paymentDate: paid > 0 ? bDate : null,
+              createdAt: nowIso,
+              costCenter: 'LABORATORY',
+              isInternalTransfer: false,
+              referenceType: 'INVOICE',
+              referenceId: invoice.id,
+              narration: `Patient Bill Lab Diagnostics (${invoice.invoiceNo}) — ${patient.fullName}`,
+              debitAccount: '1010 · Cash in Hand',
+              creditAccount: '4030 · Laboratory Diagnostic Revenue',
+              amount: netLab,
+              cogsAmount: 0,
+              createdBy: actor.email,
+            });
+          }
+          if (netPharm > 0 || totalMedicineCogs > 0) {
+            const jeSeq = dbState.journalEntries.length + 1;
+            dbState.journalEntries.unshift({
+              id: `JRN-${Date.now()}-P`,
+              voucherNo: `JV-2026-${String(jeSeq).padStart(4, '0')}`,
+              businessDate: bDate,
+              paymentDate: paid > 0 ? bDate : null,
+              createdAt: nowIso,
+              costCenter: 'PHARMACY',
+              isInternalTransfer: false,
+              referenceType: 'INVOICE',
+              referenceId: invoice.id,
+              narration: `Patient Bill Medicines (${invoice.invoiceNo}) — ${patient.fullName} (Stock Deducted & COGS ${totalMedicineCogs})`,
+              debitAccount: '1010 · Cash in Hand',
+              creditAccount: '4040 · Pharmacy Retail Revenue',
+              amount: netPharm,
+              cogsAmount: totalMedicineCogs,
+              createdBy: actor.email,
+            });
+          }
+          if (totalExtraAndLabCost > 0) {
+            const jeSeq = dbState.journalEntries.length + 1;
+            dbState.journalEntries.unshift({
+              id: `JRN-${Date.now()}-C`,
+              voucherNo: `JV-2026-${String(jeSeq).padStart(4, '0')}`,
+              businessDate: bDate,
+              paymentDate: bDate,
+              createdAt: nowIso,
+              costCenter: 'HOSPITAL',
+              isInternalTransfer: false,
+              referenceType: 'EXPENSE',
+              referenceId: invoice.id,
+              narration: `Consumable Cost Deducted (Drip/Injection/Test) on ${invoice.invoiceNo} — ${patient.fullName}`,
+              debitAccount: '5100 · Clinical Consumables Expense',
+              creditAccount: '1010 · Cash / Consumables',
+              amount: totalExtraAndLabCost,
+              cogsAmount: 0,
+              createdBy: actor.email,
+            });
+          }
+        }
+
+        const audit = appendAudit(
+          actor,
+          'PATIENT_COMBINED_BILLING',
+          'CREATE_PATIENT_COMBINED_BILL',
+          invoice.id,
+          `Created Patient Bill ${invoice.invoiceNo} for ${patient.fullName} on ${bDate}: Total ${netTotal} ${dbState.settings.currency} (${invoiceItems.length} items, Stock Deducted, Saved in Virtual Bill & Date History).`
+        );
+
+        saveState(dbState);
+        return { invoice, patient, audit };
+      });
+      res.status(201).json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
   // 10. Patient Billing: Receive Payment (Records separate paymentDate) & Process Refund
   app.post('/api/billing/payment', async (req, res) => {
     if (checkIdempotency(req, res, 'POST /api/billing/payment')) return;
@@ -3408,7 +4049,7 @@ async function startServer() {
           'SUPPLIER_CUSTOMER_LEDGER',
           'SETTLE_LEDGER_BALANCE',
           party.id,
-          `Settled ${settleAmt} ${dbState.settings.currency} for ${party.name} (${party.partyType}). Remaining balance: ${party.currentBalance}.`
+          `Settled ${settleAmt} ${dbState.settings.currency} on ${pDate} for ${party.name} (${party.partyType}). Remaining balance: ${party.currentBalance}.`
         );
 
         saveState(dbState);
@@ -3462,6 +4103,22 @@ async function startServer() {
         };
 
         dbState.employees.unshift(emp);
+        if (!dbState.staffAttendance) dbState.staffAttendance = [];
+        const todayStr = '2026-10-10';
+        dbState.staffAttendance.unshift({
+          id: `ATT-${todayStr}-${emp.id}`,
+          employeeId: emp.id,
+          empCode: emp.empCode,
+          employeeName: emp.fullName,
+          designation: emp.designation,
+          department: emp.department,
+          date: todayStr,
+          month: todayStr.slice(0, 7),
+          status: 'PRESENT',
+          remarks: 'Present on duty (Added to Staff Roster)',
+          recordedBy: actor.email,
+          updatedAt: new Date().toISOString(),
+        });
         const audit = appendAudit(
           actor,
           'HR_PAYROLL',
@@ -3472,6 +4129,111 @@ async function startServer() {
 
         saveState(dbState);
         return { employee: emp, audit };
+      });
+      res.status(201).json(result);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message });
+    }
+  });
+
+  // 11b-2. Mark or Bulk-Save Daily Staff Attendance (Present / Absent / Leave) & Save in History
+  app.post('/api/hr/attendance', async (req, res) => {
+    const actor = await resolveActor(req);
+    try {
+      const result = await runAtomicTransaction(() => {
+        if (!dbState.staffAttendance) dbState.staffAttendance = [];
+        const { date, employeeId, status, remarks, records } = req.body;
+        const targetDate = String(date || '2026-10-10').trim();
+        const targetMonth = targetDate.slice(0, 7);
+        const nowIso = new Date().toISOString();
+        const updatedRecords: StaffAttendanceRecord[] = [];
+
+        const upsertSingle = (
+          empId: string,
+          attStatus: 'PRESENT' | 'ABSENT' | 'LEAVE',
+          attRemarks?: string
+        ) => {
+          const emp = dbState.employees.find((e) => e.id === empId);
+          if (!emp) return;
+          const existingIdx = dbState.staffAttendance!.findIndex(
+            (a) => a.employeeId === emp.id && a.date === targetDate
+          );
+          const defaultRemark =
+            attStatus === 'ABSENT'
+              ? 'Absent (Ghair Hazir / Chutti)'
+              : attStatus === 'LEAVE'
+              ? 'On Leave (Chutti)'
+              : 'Present on duty (Hazir)';
+          const entry: StaffAttendanceRecord = {
+            id:
+              existingIdx >= 0
+                ? dbState.staffAttendance![existingIdx].id
+                : `ATT-${targetDate}-${emp.id}`,
+            employeeId: emp.id,
+            empCode: emp.empCode,
+            employeeName: emp.fullName,
+            designation: emp.designation,
+            department: emp.department,
+            date: targetDate,
+            month: targetMonth,
+            status: attStatus,
+            remarks: attRemarks !== undefined && attRemarks !== '' ? String(attRemarks) : defaultRemark,
+            recordedBy: actor.email,
+            updatedAt: nowIso,
+          };
+          if (existingIdx >= 0) {
+            dbState.staffAttendance![existingIdx] = entry;
+          } else {
+            dbState.staffAttendance!.unshift(entry);
+          }
+          updatedRecords.push(entry);
+        };
+
+        if (Array.isArray(records) && records.length > 0) {
+          for (const rec of records) {
+            upsertSingle(rec.employeeId, rec.status || 'PRESENT', rec.remarks);
+          }
+        } else if (employeeId) {
+          upsertSingle(employeeId, status || 'PRESENT', remarks);
+        } else {
+          // Mark all active employees as PRESENT for targetDate if not specified
+          for (const emp of dbState.employees) {
+            const existing = dbState.staffAttendance.find(
+              (a) => a.employeeId === emp.id && a.date === targetDate
+            );
+            upsertSingle(
+              emp.id,
+              existing ? existing.status : 'PRESENT',
+              existing ? existing.remarks : undefined
+            );
+          }
+        }
+
+        dbState.staffAttendance.sort((a, b) => b.date.localeCompare(a.date));
+
+        const presentCount = dbState.staffAttendance.filter(
+          (a) => a.date === targetDate && a.status === 'PRESENT'
+        ).length;
+        const absentCount = dbState.staffAttendance.filter(
+          (a) => a.date === targetDate && (a.status === 'ABSENT' || a.status === 'LEAVE')
+        ).length;
+
+        const audit = appendAudit(
+          actor,
+          'HR_ATTENDANCE',
+          'RECORD_STAFF_ATTENDANCE',
+          targetDate,
+          `Saved Staff Attendance for ${targetDate}: ${presentCount} Present (Hazir), ${absentCount} Absent/Chutti.`
+        );
+
+        saveState(dbState);
+        return {
+          date: targetDate,
+          updatedRecords,
+          presentCount,
+          absentCount,
+          audit,
+        };
       });
       res.status(201).json(result);
     } catch (err: any) {
@@ -3648,7 +4410,7 @@ async function startServer() {
     const buildSafeLocalReport = (reason: string) => {
       const lines: string[] = [
         `### Deterministic Local ERP Report (Role: ${role})`,
-        `*Mode: Local LAN Analytical Engine (${reason}) — Developed by Sajjad Qaiser Shah*`,
+        `*Mode: Local LAN Analytical Engine (${reason})*`,
         '',
       ];
 
@@ -3750,7 +4512,7 @@ async function startServer() {
 
       const configObj: Record<string, any> = {
         systemInstruction:
-          'You are the Permission-Aware Hospital ERP Reporting & Location Assistant (Developed by Sajjad Qaiser Shah). Strictly enforce role permissions: if a section in Authorized Data JSON is marked RESTRICTED_FOR_THIS_ROLE, politely state that the caller role does not have permission for those financial/clinical ledgers and only report on authorized data. When asked about nearby hospitals, pharmacies, laboratories, blood banks, or medicine suppliers, use Google Maps data to provide accurate place information. Keep responses concise, accurate, and formatted with clear bullet points.',
+          'You are the Permission-Aware Hospital ERP Reporting & Location Assistant. Strictly enforce role permissions: if a section in Authorized Data JSON is marked RESTRICTED_FOR_THIS_ROLE, politely state that the caller role does not have permission for those financial/clinical ledgers and only report on authorized data. When asked about nearby hospitals, pharmacies, laboratories, blood banks, or medicine suppliers, use Google Maps data to provide accurate place information. Keep responses concise, accurate, and formatted with clear bullet points.',
       };
 
       if (shouldUseMaps) {
@@ -4249,31 +5011,40 @@ async function startServer() {
           const idx = dbState.invoices.findIndex((i) => i.id === id);
           if (idx === -1) throw new Error('Bill / Invoice not found.');
           const [removed] = dbState.invoices.splice(idx, 1);
-          // If this was a pharmacy sale invoice and not already refunded, restore sold medicine back to stock!
-          if (
-            removed.department.startsWith('PHARMACY') &&
-            removed.status !== 'REFUNDED'
-          ) {
+          // Restore any medicine items that were deducted from Pharmacy Stock if not already refunded!
+          if (removed.status !== 'REFUNDED') {
             for (const item of removed.items) {
-              const batch = dbState.pharmacyBatches.find(
-                (b) => b.id === item.batchId || item.description.includes(b.batchNo)
-              );
-              if (batch) {
-                batch.stockQty += item.qty;
-                batch.updatedAt = nowIso;
+              if (item.batchId || removed.department.startsWith('PHARMACY')) {
+                const batch = dbState.pharmacyBatches.find(
+                  (b) => b.id === item.batchId || item.description.includes(b.batchNo)
+                );
+                if (batch) {
+                  batch.stockQty += item.qty;
+                  batch.updatedAt = nowIso;
+                }
               }
             }
           }
-          // Remove linked journal entries, lab orders, or encounters
+          // Remove linked journal entries, expenses, lab orders, or encounters
           dbState.journalEntries = dbState.journalEntries.filter((j) => j.referenceId !== id);
+          dbState.expenses = dbState.expenses.filter((e) => e.id !== id);
           dbState.labOrders = dbState.labOrders.filter((l) => l.invoiceId !== id);
           dbState.encounters = dbState.encounters.filter((e) => e.invoiceId !== id);
-          deletedSummary = `Deleted Invoice ${removed.invoiceNo} (${removed.customerName}, ${removed.netTotal} ${dbState.settings.currency}) and updated Profit & Loss.`;
+          deletedSummary = `Deleted Invoice ${removed.invoiceNo} (${removed.customerName}, ${removed.netTotal} ${dbState.settings.currency}), restored any deducted stock, and updated Home Profit & Loss.`;
         } else if (entityType === 'employee') {
           const idx = dbState.employees.findIndex((e) => e.id === id);
           if (idx === -1) throw new Error('Staff member not found.');
           const [removed] = dbState.employees.splice(idx, 1);
+          if (dbState.staffAttendance) {
+            dbState.staffAttendance = dbState.staffAttendance.filter((a) => a.employeeId !== id);
+          }
           deletedSummary = `Deleted staff member ${removed.fullName} (${removed.designation}).`;
+        } else if (entityType === 'staff-attendance') {
+          if (!dbState.staffAttendance) dbState.staffAttendance = [];
+          const idx = dbState.staffAttendance.findIndex((a) => a.id === id);
+          if (idx === -1) throw new Error('Attendance record not found.');
+          const [removed] = dbState.staffAttendance.splice(idx, 1);
+          deletedSummary = `Deleted attendance record for ${removed.employeeName} on ${removed.date} (${removed.status}).`;
         } else if (entityType === 'salary-slip') {
           const idx = dbState.salarySlips.findIndex((s) => s.id === id);
           if (idx === -1) throw new Error('Salary payment record not found.');
@@ -4752,7 +5523,7 @@ async function startServer() {
   }
 
   app.listen(3000, '0.0.0.0', () => {
-    console.log('Hospital ERP Central Server running on http://0.0.0.0:3000 — Developed by Sajjad Qaiser Shah');
+    console.log('Hospital ERP Central Server running on http://0.0.0.0:3000');
   });
 }
 

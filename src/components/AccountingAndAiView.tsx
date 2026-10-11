@@ -1,6 +1,5 @@
 /**
  * Double-Entry Accounting, Consolidated P&L, Date-Wise Analytics & Permission-Aware AI Assistant
- * Branded with: Developed by Sajjad Qaiser Shah
  */
 import React, { useState } from 'react';
 import {
@@ -314,7 +313,7 @@ export const AccountingAndAiView: React.FC<AccountingAndAiViewProps> = ({
                 {analytics.consolidated.inventoryPurchasesCapitalizedExcluded.toLocaleString()} {cur}
               </strong>
             </span>
-            <span>Developed by Sajjad Qaiser Shah</span>
+            <span>{settings.hospitalName}</span>
           </div>
         </div>
 

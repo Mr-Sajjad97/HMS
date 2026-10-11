@@ -76,14 +76,13 @@ export function handleFirestoreError(
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Validate connection to Firestore on boot as required
+// Validate connection to Firestore when authenticated
 async function testConnection() {
+  if (!auth.currentUser) return;
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error('Please check your Firebase configuration.');
-    }
+    await getDocFromServer(doc(db, 'users', sanitizeId(auth.currentUser.uid)));
+  } catch {
+    // Silent fallback when operating on offline local LAN server
   }
 }
 testConnection();

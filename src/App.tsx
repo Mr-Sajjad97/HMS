@@ -3,10 +3,9 @@
  * Developed by Sajjad Qaiser Shah
  */
 import React, { useState, useEffect, useCallback } from 'react';
-import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
+import { onAuthStateChanged, User } from 'firebase/auth';
 import {
   auth,
-  googleAuthProvider,
   syncUserProfileToFirestore,
   mirrorAuditLogToFirestore,
 } from './lib/firebase.ts';
@@ -14,35 +13,18 @@ import {
   Stethoscope,
   FlaskConical,
   Pill,
-  Receipt,
-  Landmark,
-  ShieldCheck,
-  Monitor,
-  Smartphone,
-  Globe,
-  Wifi,
-  WifiOff,
   Printer,
   CheckCircle2,
   AlertTriangle,
   Plus,
-  RefreshCw,
-  LogIn,
   LogOut,
   Barcode,
-  ArrowRightLeft,
   LayoutGrid,
   Users,
   Calendar,
-  FileText,
   CreditCard,
-  Settings,
   Search,
-  Bell,
-  MessageSquare,
-  ChevronDown,
   Download,
-  Lock,
   KeyRound,
   Upload,
   History,
@@ -56,11 +38,21 @@ import {
   Minimize2,
   ArrowLeft,
   X,
+  Receipt,
 } from 'lucide-react';
 import {
   PrintableDocumentModal,
   PrintableDocPayload,
 } from './components/PrintableDocumentModal.tsx';
+import {
+  printViaConnectedPrinter,
+  supplierBillToPrintableInvoice,
+  expenseToPrintableInvoice,
+  journalEntryToPrintableInvoice,
+  patientRegistrationToPrintableInvoice,
+  encounterToFallbackInvoice,
+} from './utils/printerEngine.ts';
+import { PatientBillBuilderView } from './components/PatientBillBuilderView.tsx';
 import {
   ResponsiveContainer,
   LineChart,
@@ -77,7 +69,6 @@ import { ArchitectureAndAcceptanceView } from './components/ArchitectureAndAccep
 import { HomeDashboardView } from './components/HomeDashboardView.tsx';
 import type {
   StaffRole,
-  ClientFormFactor,
   HospitalSettings,
   Doctor,
   Patient,
@@ -87,10 +78,10 @@ import type {
   PharmacyBatch,
   Invoice,
   JournalEntry,
-  LedgerParty,
   ExpenseRecord,
   Employee,
   SalarySlip,
+  StaffAttendanceRecord,
   AuditLogEntry,
   BackupRecord,
   SupplierBill,
@@ -99,6 +90,7 @@ import type {
 
 type WorkspaceModule =
   | 'home'
+  | 'patient_billing'
   | 'clinical'
   | 'laboratory'
   | 'pharmacy'
@@ -108,7 +100,6 @@ type WorkspaceModule =
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [activeRole, setActiveRole] = useState<StaffRole>('ADMIN');
-  const [clientMode, setClientMode] = useState<ClientFormFactor>('LAN_WEB');
   const [activeModule, setActiveModule] = useState<WorkspaceModule>('home');
   const [activeSidebarKey, setActiveSidebarKey] = useState<string>('dashboard');
   const [moduleHistory, setModuleHistory] = useState<WorkspaceModule[]>([]);
@@ -142,10 +133,11 @@ export default function App() {
   const [pharmacyBatches, setPharmacyBatches] = useState<PharmacyBatch[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([]);
-  const [ledgerParties, setLedgerParties] = useState<LedgerParty[]>([]);
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [salarySlips, setSalarySlips] = useState<SalarySlip[]>([]);
+  const [staffAttendance, setStaffAttendance] = useState<StaffAttendanceRecord[]>([]);
+  const [attendanceDate, setAttendanceDate] = useState<string>('2026-10-10');
   const [supplierBills, setSupplierBills] = useState<SupplierBill[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
 
@@ -170,8 +162,8 @@ export default function App() {
   const [isAdminModalMinimized, setIsAdminModalMinimized] = useState<boolean>(false);
   const [isAdminModalFullScreen, setIsAdminModalFullScreen] = useState<boolean>(false);
   const [isAppMinimized, setIsAppMinimized] = useState<boolean>(false);
-  const [isAppExited, setIsAppExited] = useState<boolean>(false);
   const [isAppFullScreen, setIsAppFullScreen] = useState<boolean>(false);
+  const [showSidebarInFullScreen, setShowSidebarInFullScreen] = useState<boolean>(false);
   const [adminAccountForm, setAdminAccountForm] = useState({
     adminFullName: 'Hospital Administrator',
     adminEmail: 'admin@hospital.local',
@@ -286,7 +278,6 @@ export default function App() {
   >({});
 
   // 4. Pharmacy POS & Inventory Forms
-  const [posSaleType, setPosSaleType] = useState<'RETAIL' | 'WHOLESALE'>('RETAIL');
   const [posCustomerName, setPosCustomerName] = useState('Walk-in OPD Patient');
   const [posPaymentMethod, setPosPaymentMethod] = useState<'CASH' | 'CARD' | 'CREDIT_LEDGER'>('CASH');
   const [posBusinessDate, setPosBusinessDate] = useState('2026-10-10');
@@ -365,13 +356,6 @@ export default function App() {
   const [lastAutoSavedTime, setLastAutoSavedTime] = useState<string>(
     new Date().toLocaleTimeString()
   );
-
-  const [transferForm, setTransferForm] = useState({
-    batchId: 'BAT-501',
-    qty: 5,
-    targetWard: 'Surgical Ward A Emergency Trolley',
-    businessDate: '2026-10-10',
-  });
 
   // 5. Expense & Payroll Forms
   const [expenseForm, setExpenseForm] = useState({
@@ -457,10 +441,10 @@ export default function App() {
         setPharmacyBatches(st.pharmacyBatches);
         setInvoices(st.invoices);
         setJournalEntries(st.journalEntries);
-        setLedgerParties(st.ledgerParties);
         setExpenses(st.expenses);
         setEmployees(st.employees);
         setSalarySlips(st.salarySlips);
+        setStaffAttendance(st.staffAttendance || []);
         setSupplierBills(st.supplierBills || []);
         setAuditLogs(st.auditLogs);
         setBackups(st.backups);
@@ -577,21 +561,53 @@ export default function App() {
     expenseForm,
   ]);
 
-  // Listen to native browser Fullscreen changes
+  // Listen to native browser Fullscreen changes & ESC key to keep full-screen state in sync
   useEffect(() => {
     const handleFsChange = () => {
-      setIsAppFullScreen(Boolean(document.fullscreenElement));
+      const docAny: any = document;
+      const isNativeFs = Boolean(
+        docAny.fullscreenElement ||
+          docAny.webkitFullscreenElement ||
+          docAny.mozFullScreenElement ||
+          docAny.msFullscreenElement
+      );
+      setIsAppFullScreen(isNativeFs);
+      if (!isNativeFs) {
+        setIsModuleFullScreen(false);
+        setShowSidebarInFullScreen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        const docAny: any = document;
+        if (!docAny.fullscreenElement && !docAny.webkitFullscreenElement) {
+          setIsModuleFullScreen(false);
+          setIsAppFullScreen(false);
+          setShowSidebarInFullScreen(false);
+        }
+      }
     };
     document.addEventListener('fullscreenchange', handleFsChange);
-    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+    document.addEventListener('webkitfullscreenchange', handleFsChange);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFsChange);
+      document.removeEventListener('webkitfullscreenchange', handleFsChange);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
   }, []);
 
   const getModuleMeta = useCallback((mod: WorkspaceModule) => {
     switch (mod) {
       case 'home':
         return { key: 'dashboard', label: 'Dashboard (Consolidated Profit & Loss)' };
+      case 'patient_billing':
+        return {
+          key: 'patient_billing',
+          label: 'Make Patient Bill (Doctor + Test + Medicine + Drip)',
+        };
       case 'pharmacy':
-        return { key: 'records', label: 'Pharmacy & Medicine Stock' };
+        return { key: 'records', label: 'Pharmacy & Medical Store (Medicines Only)' };
       case 'billing_hr':
         return { key: 'billing', label: 'Customer Billing, Staff & Salary' };
       case 'laboratory':
@@ -654,19 +670,51 @@ export default function App() {
     }
   }, [activeModule, moduleHistory, getModuleMeta]);
 
-  const toggleBrowserFullScreen = async () => {
-    const nextState = !isModuleFullScreen && !isAppFullScreen;
-    setIsModuleFullScreen(nextState);
-    setIsAppFullScreen(nextState);
+  const requestOrExitNativeBrowserFullScreen = async (enterFullScreen: boolean) => {
     try {
-      if (nextState && !document.fullscreenElement) {
-        await document.documentElement.requestFullscreen();
-      } else if (!nextState && document.fullscreenElement) {
-        await document.exitFullscreen();
+      const docEl: any = document.documentElement;
+      const docAny: any = document;
+      const activeFsEl =
+        docAny.fullscreenElement ||
+        docAny.webkitFullscreenElement ||
+        docAny.mozFullScreenElement ||
+        docAny.msFullscreenElement;
+      if (enterFullScreen && !activeFsEl) {
+        if (docEl.requestFullscreen) {
+          await docEl.requestFullscreen();
+        } else if (docEl.webkitRequestFullscreen) {
+          await docEl.webkitRequestFullscreen();
+        } else if (docEl.mozRequestFullScreen) {
+          await docEl.mozRequestFullScreen();
+        } else if (docEl.msRequestFullscreen) {
+          await docEl.msRequestFullscreen();
+        }
+      } else if (!enterFullScreen && activeFsEl) {
+        if (docAny.exitFullscreen) {
+          await docAny.exitFullscreen();
+        } else if (docAny.webkitExitFullscreen) {
+          await docAny.webkitExitFullscreen();
+        } else if (docAny.mozCancelFullScreen) {
+          await docAny.mozCancelFullScreen();
+        } else if (docAny.msExitFullscreen) {
+          await docAny.msExitFullscreen();
+        }
       }
     } catch {
-      // Visual full-screen workspace (isModuleFullScreen) still works inside restricted iframes
+      // Visual full-screen workspace (isModuleFullScreen) works inside restricted iframes
     }
+  };
+
+  const toggleBrowserFullScreen = async () => {
+    const currentlyFull = isModuleFullScreen || isAppFullScreen;
+    const nextState = !currentlyFull;
+    setIsModuleFullScreen(nextState);
+    setIsAppFullScreen(nextState);
+    setIsAppMinimized(false);
+    if (!nextState) {
+      setShowSidebarInFullScreen(false);
+    }
+    await requestOrExitNativeBrowserFullScreen(nextState);
   };
 
   // Auto-save Admin Profile Changes silently when edited or when closing modal with Cross (✕)
@@ -751,15 +799,6 @@ export default function App() {
     });
     return () => unsub();
   }, [activeRole]);
-
-  const handleGoogleSignIn = async () => {
-    try {
-      await signInWithPopup(auth, googleAuthProvider);
-      notify('success', 'Authenticated with Google Sign-In & synced staff profile.');
-    } catch (err: any) {
-      notify('error', `Sign-in notice: ${err.message || 'Using Local LAN Workstation session.'}`);
-    }
-  };
 
   // Mutating Action Helpers (With Idempotency Key + Firestore Audit Mirror)
   const postMutation = async (
@@ -953,6 +992,27 @@ export default function App() {
     }
   };
 
+  const handleCreateCombinedPatientBill = async (
+    payload: any,
+    _printAction: 'OPEN_VIRTUAL_AND_PRINT_MODAL' | 'DIRECT_HARDWARE_PRINT' | 'VIRTUAL_ONLY'
+  ): Promise<Invoice | null> => {
+    try {
+      const res = await postMutation('/api/billing/patient-combined-bill', payload);
+      if (payload.businessDate) {
+        setAttendanceDate(payload.businessDate);
+      }
+      notify(
+        'success',
+        `Patient Bill ${res.invoice.invoiceNo} saved for ${res.invoice.customerName} (Total: ${res.invoice.netTotal.toLocaleString()} ${settings.currency}). Deducted from Stock & Home Calculation, and saved in Virtual Bill & Date-Wise Patient History.`
+      );
+      setPrintableDoc({ type: 'INVOICE', data: res.invoice });
+      return res.invoice as Invoice;
+    } catch (err: any) {
+      notify('error', err.message);
+      return null;
+    }
+  };
+
   const handleAddStaffMember = async (e: React.FormEvent) => {
     e.preventDefault();
     const chosenDesignation =
@@ -989,6 +1049,71 @@ export default function App() {
         `Salary of ${res.slip.netPaid.toLocaleString()} ${settings.currency} paid to ${emp.fullName} & deducted from Hospital Profit/Loss.`
       );
       setPrintableDoc({ type: 'SALARY_SLIP', data: res.slip });
+    } catch (err: any) {
+      notify('error', err.message);
+    }
+  };
+
+  const handleMarkStaffAttendance = async (
+    emp: Employee,
+    status: 'PRESENT' | 'ABSENT' | 'LEAVE',
+    dateOverride?: string,
+    remarks?: string
+  ) => {
+    const targetDate = dateOverride || attendanceDate || '2026-10-10';
+    try {
+      await postMutation('/api/hr/attendance', {
+        date: targetDate,
+        employeeId: emp.id,
+        status,
+        remarks,
+      });
+      notify(
+        'success',
+        `Attendance Saved (${targetDate}): ${emp.fullName} marked as ${
+          status === 'PRESENT'
+            ? 'PRESENT (Hazir)'
+            : status === 'ABSENT'
+            ? 'ABSENT (Ghair Hazir / Chutti)'
+            : 'ON LEAVE (Chutti)'
+        } & saved to History.`
+      );
+    } catch (err: any) {
+      notify('error', err.message);
+    }
+  };
+
+  const handleSaveDailyAttendanceBatch = async (
+    targetDate: string,
+    forceAllPresent?: boolean
+  ) => {
+    try {
+      const recordsPayload = employees.map((emp) => {
+        const existing = staffAttendance.find(
+          (a) => a.employeeId === emp.id && a.date === targetDate
+        );
+        const status = forceAllPresent
+          ? 'PRESENT'
+          : existing
+          ? existing.status
+          : 'PRESENT';
+        return {
+          employeeId: emp.id,
+          status,
+          remarks:
+            status === 'PRESENT'
+              ? 'Present on duty (Hazir)'
+              : existing?.remarks || 'Absent (Ghair Hazir / Chutti)',
+        };
+      });
+      const res = await postMutation('/api/hr/attendance', {
+        date: targetDate,
+        records: recordsPayload,
+      });
+      notify(
+        'success',
+        `Daily Staff Attendance for ${targetDate} saved to History & Backup (${res.presentCount} Present / Hazir, ${res.absentCount} Absent / Chutti).`
+      );
     } catch (err: any) {
       notify('error', err.message);
     }
@@ -1065,6 +1190,7 @@ export default function App() {
       | 'supplier-bill'
       | 'invoice'
       | 'employee'
+      | 'staff-attendance'
       | 'salary-slip'
       | 'expense'
       | 'journal-entry',
@@ -1216,19 +1342,6 @@ export default function App() {
     }
   };
 
-  const handleInternalTransfer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const res = await postMutation('/api/pharmacy/internal-transfer', transferForm);
-      notify(
-        'success',
-        `Internal Transfer completed for ${res.batch.brandName} (Excluded from Revenue & Expense).`
-      );
-    } catch (err: any) {
-      notify('error', err.message);
-    }
-  };
-
   // Billing, Expense & HR Handlers
   const handleSettleInvoice = async (inv: Invoice) => {
     const due = inv.netTotal - inv.paidAmount - inv.refundedAmount;
@@ -1245,49 +1358,12 @@ export default function App() {
     }
   };
 
-  const handleRefundInvoice = async (inv: Invoice) => {
-    const refundable = inv.paidAmount - inv.refundedAmount;
-    if (refundable <= 0) return;
-    try {
-      const res = await postMutation('/api/billing/refund', {
-        invoiceId: inv.id,
-        refundAmount: refundable,
-        reason: 'Authorized patient refund',
-        paymentDate: '2026-10-10',
-      });
-      notify(
-        'success',
-        `Issued refund of ${refundable.toLocaleString()} ${settings.currency} on ${res.invoice.invoiceNo}.`
-      );
-    } catch (err: any) {
-      notify('error', err.message);
-    }
-  };
-
   const handleCreateExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       const res = await postMutation('/api/expenses', expenseForm);
       setExpenseForm({ ...expenseForm, description: '' });
       notify('success', `Expense ${res.expense.voucherNo} recorded in General Ledger.`);
-    } catch (err: any) {
-      notify('error', err.message);
-    }
-  };
-
-  const handleSettleParty = async (party: LedgerParty) => {
-    const amt = Math.min(25000, party.currentBalance);
-    if (amt <= 0) return;
-    try {
-      await postMutation('/api/ledgers/settle', {
-        partyId: party.id,
-        amount: amt,
-        paymentDate: '2026-10-10',
-      });
-      notify(
-        'success',
-        `Settled ${amt.toLocaleString()} ${settings.currency} for ${party.name}.`
-      );
     } catch (err: any) {
       notify('error', err.message);
     }
@@ -1309,29 +1385,135 @@ export default function App() {
     }
   };
 
-  const handleToggleOfflineMode = async () => {
-    const nextOffline = !settings.simulatedInternetOffline;
-    try {
-      await postMutation(
-        '/api/settings',
-        { simulatedInternetOffline: nextOffline },
-        'PATCH'
-      );
-      notify(
-        'success',
-        nextOffline
-          ? 'Internet Disconnected Simulation Active: Operating 100% on Local Hospital LAN Server.'
-          : 'External Internet Restored: Cloud Sync & Gemini AI Assistant Active.'
-      );
-    } catch (err: any) {
-      notify('error', err.message);
-    }
+  const cur = settings.currency;
+
+  // =========================================================================
+  // DAILY & MONTHLY PATIENTS, STAFF ATTENDANCE (HAZIR / CHUTTIYAN) & MEDICINES METRICS
+  // =========================================================================
+  const selectedDayStr = attendanceDate || '2026-10-10';
+  const selectedMonthStr = payrollMonth || selectedDayStr.slice(0, 7);
+
+  // Patients who visited/registered/billed on selectedDayStr
+  const dailyPatientNames = Array.from(
+    new Set([
+      ...patients
+        .filter((p) => p.registeredBusinessDate === selectedDayStr)
+        .map((p) => p.fullName),
+      ...encounters
+        .filter((e) => e.businessDate === selectedDayStr)
+        .map((e) => e.patientName),
+      ...labOrders
+        .filter((l) => l.businessDate === selectedDayStr)
+        .map((l) => l.patientName),
+      ...invoices
+        .filter(
+          (i) =>
+            i.businessDate === selectedDayStr &&
+            !i.department.startsWith('PHARMACY_WHOLESALE')
+        )
+        .map((i) => i.customerName),
+    ])
+  );
+
+  // Helper to get a staff member's attendance status on a given date
+  const getStaffStatusOnDate = (
+    empId: string,
+    dateStr: string
+  ): 'PRESENT' | 'ABSENT' | 'LEAVE' => {
+    const rec = staffAttendance.find((a) => a.employeeId === empId && a.date === dateStr);
+    return rec ? rec.status : 'PRESENT';
   };
 
-  const cur = settings.currency;
-  const expiringOrLowBatches = pharmacyBatches.filter(
-    (b) => b.expiryDate <= '2026-12-31' || b.stockQty <= b.reorderLevel
+  const dailyPresentStaffList = employees.filter(
+    (emp) => getStaffStatusOnDate(emp.id, selectedDayStr) === 'PRESENT'
   );
+  const dailyAbsentStaffList = employees.filter(
+    (emp) => getStaffStatusOnDate(emp.id, selectedDayStr) !== 'PRESENT'
+  );
+
+  const totalMedicineUnitsInStock = pharmacyBatches.reduce(
+    (acc, b) => acc + (b.stockQty || 0) + (b.wardStockQty || 0),
+    0
+  );
+
+  // Per-Employee Monthly & All-Time Attendance / Chuttiyan Summary
+  const getEmployeeAttendanceSummary = (empId: string, monthPrefix: string) => {
+    const allEmpRecords = staffAttendance.filter((a) => a.employeeId === empId);
+    const monthRecords = allEmpRecords.filter((a) => a.month === monthPrefix);
+
+    const monthPresentDates = monthRecords
+      .filter((a) => a.status === 'PRESENT')
+      .map((a) => a.date)
+      .sort();
+    const monthAbsentDates = monthRecords
+      .filter((a) => a.status === 'ABSENT' || a.status === 'LEAVE')
+      .map((a) => a.date)
+      .sort();
+
+    const allTimePresentDates = allEmpRecords
+      .filter((a) => a.status === 'PRESENT')
+      .map((a) => a.date)
+      .sort();
+    const allTimeAbsentDates = allEmpRecords
+      .filter((a) => a.status === 'ABSENT' || a.status === 'LEAVE')
+      .map((a) => a.date)
+      .sort();
+
+    // Month-by-month breakdown of absences (Chuttiyan) and present days
+    const monthsMap = new Map<
+      string,
+      { month: string; presentCount: number; absentCount: number; absentDates: string[]; presentDates: string[] }
+    >();
+    for (const r of allEmpRecords) {
+      const m = r.month || r.date.slice(0, 7);
+      if (!monthsMap.has(m)) {
+        monthsMap.set(m, {
+          month: m,
+          presentCount: 0,
+          absentCount: 0,
+          absentDates: [],
+          presentDates: [],
+        });
+      }
+      const bucket = monthsMap.get(m)!;
+      if (r.status === 'PRESENT') {
+        bucket.presentCount += 1;
+        bucket.presentDates.push(r.date);
+      } else {
+        bucket.absentCount += 1;
+        bucket.absentDates.push(r.date);
+      }
+    }
+
+    const monthlyBreakdown = Array.from(monthsMap.values()).sort((a, b) =>
+      b.month.localeCompare(a.month)
+    );
+
+    return {
+      monthPresentCount: monthPresentDates.length,
+      monthAbsentCount: monthAbsentDates.length,
+      monthPresentDates,
+      monthAbsentDates,
+      allTimePresentCount: allTimePresentDates.length,
+      allTimeAbsentCount: allTimeAbsentDates.length,
+      allTimePresentDates,
+      allTimeAbsentDates,
+      monthlyBreakdown,
+    };
+  };
+
+  // All unique dates recorded across hospital history (patients + staff attendance)
+  const allRecordedHistoryDates = Array.from(
+    new Set([
+      selectedDayStr,
+      ...staffAttendance.map((a) => a.date),
+      ...patients.map((p) => p.registeredBusinessDate),
+      ...encounters.map((e) => e.businessDate),
+      ...invoices.map((i) => i.businessDate),
+    ])
+  )
+    .filter(Boolean)
+    .sort((a, b) => b.localeCompare(a));
 
   return (
     <div
@@ -1551,7 +1733,11 @@ export default function App() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setIsLockModalFullScreen((prev) => !prev)}
+                    onClick={() => {
+                      const next = !isLockModalFullScreen;
+                      setIsLockModalFullScreen(next);
+                      requestOrExitNativeBrowserFullScreen(next);
+                    }}
                     className="h-8 w-8 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 inline-flex items-center justify-center cursor-pointer transition-colors"
                     title={isLockModalFullScreen ? 'Restore Down' : 'Maximize / Full Screen'}
                   >
@@ -1682,12 +1868,21 @@ export default function App() {
 
               {loginMode === 'PIN' ? (
                 <div className="space-y-3">
+                  <input
+                    type="text"
+                    name="username"
+                    autoComplete="username"
+                    value={settings.adminUsername || 'admin'}
+                    readOnly
+                    className="hidden"
+                  />
                   <div>
                     <label className="block text-slate-600 mb-1 font-medium">
                       Enter Secret Security PIN
                     </label>
                     <input
                       type="password"
+                      autoComplete="current-password"
                       maxLength={6}
                       value={pinInput}
                       onChange={(e) => setPinInput(e.target.value)}
@@ -1727,6 +1922,7 @@ export default function App() {
                     </label>
                     <input
                       type="text"
+                      autoComplete="username"
                       value={usernameInput}
                       onChange={(e) => setUsernameInput(e.target.value)}
                       placeholder="Enter your Admin Username or Email..."
@@ -1739,6 +1935,7 @@ export default function App() {
                     </label>
                     <input
                       type="password"
+                      autoComplete="current-password"
                       value={passwordInput}
                       onChange={(e) => setPasswordInput(e.target.value)}
                       placeholder="••••••••"
@@ -1754,6 +1951,7 @@ export default function App() {
                     </label>
                     <input
                       type="text"
+                      autoComplete="name"
                       value={adminAccountForm.adminFullName}
                       onChange={(e) =>
                         setAdminAccountForm({
@@ -1771,6 +1969,7 @@ export default function App() {
                     </label>
                     <input
                       type="text"
+                      autoComplete="email"
                       value={adminAccountForm.adminEmail}
                       onChange={(e) =>
                         setAdminAccountForm({
@@ -1789,6 +1988,7 @@ export default function App() {
                       </label>
                       <input
                         type="text"
+                        autoComplete="username"
                         value={adminAccountForm.adminUsername}
                         onChange={(e) =>
                           setAdminAccountForm({
@@ -1806,6 +2006,7 @@ export default function App() {
                       </label>
                       <input
                         type="password"
+                        autoComplete="new-password"
                         value={adminAccountForm.adminPassword}
                         onChange={(e) =>
                           setAdminAccountForm({
@@ -1878,19 +2079,28 @@ export default function App() {
 
       {showChangePinModal && !isChangePinMinimized && (
         <div
-          className={`fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center overflow-y-auto ${
-            isChangePinFullScreen ? 'p-0' : 'p-4'
+          className={`fixed inset-0 z-50 flex justify-center overflow-y-auto ${
+            isChangePinFullScreen
+              ? 'items-start bg-white p-0 w-screen h-screen'
+              : 'items-center bg-slate-900/60 p-4'
           }`}
         >
           <form
             onSubmit={handleSaveNewSecurityPin}
             className={`bg-white border border-slate-200 w-full space-y-4 text-xs ${
               isChangePinFullScreen
-                ? 'w-screen min-h-screen max-w-none rounded-none p-6 md:p-12 flex flex-col justify-center'
+                ? 'w-screen min-h-screen max-w-2xl mx-auto rounded-none border-0 p-6 md:p-10'
                 : 'rounded-xl max-w-md p-6'
             }`}
           >
-            <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-200">
+            <div
+              onDoubleClick={() => {
+                const next = !isChangePinFullScreen;
+                setIsChangePinFullScreen(next);
+                requestOrExitNativeBrowserFullScreen(next);
+              }}
+              className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-200 select-none"
+            >
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -1919,8 +2129,16 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsChangePinFullScreen((prev) => !prev)}
-                  className="h-8 w-8 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 inline-flex items-center justify-center cursor-pointer transition-colors"
+                  onClick={() => {
+                    const next = !isChangePinFullScreen;
+                    setIsChangePinFullScreen(next);
+                    requestOrExitNativeBrowserFullScreen(next);
+                  }}
+                  className={`h-8 w-8 rounded-md border inline-flex items-center justify-center cursor-pointer transition-colors ${
+                    isChangePinFullScreen
+                      ? 'bg-[#1D5464] text-white border-[#1D5464]'
+                      : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
+                  }`}
                   title={isChangePinFullScreen ? 'Restore Down' : 'Maximize / Full Screen'}
                 >
                   {isChangePinFullScreen ? (
@@ -1950,12 +2168,21 @@ export default function App() {
             <p className="text-slate-500">
               For security, the existing PIN is hidden. Enter your current (old) PIN first to set a new PIN.
             </p>
+            <input
+              type="text"
+              name="username"
+              autoComplete="username"
+              value={settings.adminUsername || 'admin'}
+              readOnly
+              className="hidden"
+            />
             <div>
               <label className="block text-slate-700 font-semibold mb-1">
                 1. Enter Current (Old) PIN *
               </label>
               <input
                 type="password"
+                autoComplete="current-password"
                 maxLength={12}
                 value={oldPinInput}
                 onChange={(e) => setOldPinInput(e.target.value)}
@@ -1969,6 +2196,7 @@ export default function App() {
               </label>
               <input
                 type="password"
+                autoComplete="new-password"
                 maxLength={6}
                 value={newPinInput}
                 onChange={(e) => setNewPinInput(e.target.value.replace(/\D/g, ''))}
@@ -1982,6 +2210,7 @@ export default function App() {
               </label>
               <input
                 type="password"
+                autoComplete="new-password"
                 maxLength={6}
                 value={confirmNewPinInput}
                 onChange={(e) => setConfirmNewPinInput(e.target.value.replace(/\D/g, ''))}
@@ -2057,19 +2286,28 @@ export default function App() {
 
       {showAdminAccountModal && !isAdminModalMinimized && (
         <div
-          className={`fixed inset-0 z-50 bg-slate-900/60 flex items-center justify-center overflow-y-auto ${
-            isAdminModalFullScreen ? 'p-0' : 'p-4'
+          className={`fixed inset-0 z-50 flex justify-center overflow-y-auto ${
+            isAdminModalFullScreen
+              ? 'items-start bg-white p-0 w-screen h-screen'
+              : 'items-center bg-slate-900/60 p-4'
           }`}
         >
           <form
             onSubmit={handleSaveCustomAdminAccount}
             className={`bg-white border border-slate-200 w-full space-y-4 text-xs ${
               isAdminModalFullScreen
-                ? 'w-screen min-h-screen max-w-none rounded-none p-6 md:p-12 flex flex-col justify-center'
+                ? 'w-screen min-h-screen max-w-2xl mx-auto rounded-none border-0 p-6 md:p-10'
                 : 'rounded-xl max-w-md p-6'
             }`}
           >
-            <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-200">
+            <div
+              onDoubleClick={() => {
+                const next = !isAdminModalFullScreen;
+                setIsAdminModalFullScreen(next);
+                requestOrExitNativeBrowserFullScreen(next);
+              }}
+              className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-200 select-none"
+            >
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -2102,8 +2340,16 @@ export default function App() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setIsAdminModalFullScreen((prev) => !prev)}
-                  className="h-8 w-8 rounded-md bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 inline-flex items-center justify-center cursor-pointer transition-colors"
+                  onClick={() => {
+                    const next = !isAdminModalFullScreen;
+                    setIsAdminModalFullScreen(next);
+                    requestOrExitNativeBrowserFullScreen(next);
+                  }}
+                  className={`h-8 w-8 rounded-md border inline-flex items-center justify-center cursor-pointer transition-colors ${
+                    isAdminModalFullScreen
+                      ? 'bg-[#1D5464] text-white border-[#1D5464]'
+                      : 'bg-slate-100 hover:bg-slate-200 border-slate-300 text-slate-700'
+                  }`}
                   title={isAdminModalFullScreen ? 'Restore Down' : 'Maximize / Full Screen'}
                 >
                   {isAdminModalFullScreen ? (
@@ -2165,6 +2411,7 @@ export default function App() {
                 </label>
                 <input
                   type="text"
+                  autoComplete="username"
                   value={adminAccountForm.adminUsername}
                   onChange={(e) =>
                     setAdminAccountForm({ ...adminAccountForm, adminUsername: e.target.value })
@@ -2179,6 +2426,7 @@ export default function App() {
                 </label>
                 <input
                   type="password"
+                  autoComplete="new-password"
                   value={adminAccountForm.adminPassword}
                   onChange={(e) =>
                     setAdminAccountForm({ ...adminAccountForm, adminPassword: e.target.value })
@@ -2208,9 +2456,10 @@ export default function App() {
       )}
 
       {/* =====================================================================
-          LEFT DEEP-TEAL SIDEBAR (ALWAYS VISIBLE EVEN IN FULL SCREEN — NEVER DISAPPEARS)
+          LEFT DEEP-TEAL SIDEBAR (AUTO-COLLAPSES FOR 100% EDGE-TO-EDGE FULL SCREEN UNLESS TOGGLED OPEN)
          ===================================================================== */}
-      <aside className="flex w-56 md:w-64 h-screen overflow-y-auto bg-[#1D5464] text-white flex-col justify-between shrink-0 select-none">
+      {(!(isModuleFullScreen || isAppFullScreen) || showSidebarInFullScreen) && (
+      <aside className="no-print flex w-56 md:w-64 h-screen overflow-y-auto bg-[#1D5464] text-white flex-col justify-between shrink-0 select-none z-40">
         <div>
           {/* Brand Crest & Wordmark (No Developer Name at Top) */}
           <div className="px-6 py-5 flex items-center gap-3 border-b border-white/10">
@@ -2236,6 +2485,12 @@ export default function App() {
                   label: 'Dashboard (P&L)',
                   mod: 'home' as WorkspaceModule,
                   icon: LayoutGrid,
+                },
+                {
+                  key: 'patient_billing',
+                  label: 'Make Patient Bill',
+                  mod: 'patient_billing' as WorkspaceModule,
+                  icon: Receipt,
                 },
                 {
                   key: 'records',
@@ -2290,7 +2545,7 @@ export default function App() {
           </nav>
         </div>
 
-        {/* Bottom Sidebar Actions & SINGLE Developer Credit at the Very Bottom */}
+        {/* Bottom Sidebar Actions: Login/Logout, Change PIN, Hospital Administrator & Developer Credit */}
         <div className="p-4 border-t border-white/10 space-y-2 text-xs">
           <div className="px-3 py-2 rounded-lg bg-white/10 text-teal-100 text-[11px] flex items-center justify-between">
             <span className="flex items-center gap-1.5 font-medium">
@@ -2299,6 +2554,8 @@ export default function App() {
             </span>
             <span className="font-mono text-[10px] text-teal-200">{lastAutoSavedTime}</span>
           </div>
+
+          {/* 1. Login / Logout (PIN) */}
           <button
             type="button"
             onClick={() => {
@@ -2310,39 +2567,156 @@ export default function App() {
             <LogOut className="w-3.5 h-3.5" />
             <span>Login / Logout (PIN)</span>
           </button>
+
+          {/* 2. Change PIN (Below Login / Logout) */}
+          <button
+            type="button"
+            onClick={() => {
+              setOldPinInput('');
+              setNewPinInput('');
+              setConfirmNewPinInput('');
+              setPinModalError('');
+              setIsChangePinMinimized(false);
+              setShowChangePinModal(true);
+            }}
+            className="w-full py-2 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white font-semibold flex items-center justify-center gap-2 transition-colors cursor-pointer"
+          >
+            <KeyRound className="w-3.5 h-3.5 text-teal-200" />
+            <span>Change PIN (••••)</span>
+          </button>
+
+          {/* 3. Hospital Administrator / Active Profile & Role Selector (Below Change PIN) */}
+          <div className="p-2.5 rounded-lg bg-white/10 border border-white/10 space-y-2">
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsAdminModalMinimized(false);
+                  setShowAdminAccountModal(true);
+                }}
+                title="Click to customize Admin Name, Email & Login ID"
+                className="w-8 h-8 rounded-full bg-teal-500/30 border border-teal-300/40 text-white font-bold text-xs flex items-center justify-center shrink-0 cursor-pointer"
+              >
+                {(loggedInStaffName || 'AD').slice(0, 2).toUpperCase()}
+              </button>
+              <div className="min-w-0 flex-1 text-left">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAdminModalMinimized(false);
+                    setShowAdminAccountModal(true);
+                  }}
+                  className="text-xs font-bold text-white hover:text-teal-200 truncate block w-full text-left cursor-pointer"
+                  title="Customize Hospital Administrator ID"
+                >
+                  {loggedInStaffName}
+                </button>
+                <select
+                  value={activeRole}
+                  onChange={(e) => setActiveRole(e.target.value as StaffRole)}
+                  className="w-full mt-0.5 text-[11px] text-teal-100 bg-[#16424F] border border-white/15 rounded px-1.5 py-0.5 font-medium cursor-pointer focus:outline-none"
+                >
+                  <option value="ADMIN">Admin ({loggedInStaffEmail})</option>
+                  <option value="PHARMACIST">Pharmacist</option>
+                  <option value="CASHIER">Cashier</option>
+                  <option value="LAB_TECH">Lab Tech</option>
+                  <option value="ACCOUNTANT">Accountant</option>
+                  <option value="HR_MANAGER">HR Manager</option>
+                  <option value="DOCTOR">Doctor</option>
+                  <option value="NURSE">Nurse</option>
+                  <option value="COOK">Cook / Kitchen</option>
+                  <option value="SWEEPER">Cleaner / Sweeper</option>
+                  <option value="OTHER">Other Staff</option>
+                </select>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setIsAdminModalMinimized(false);
+                setShowAdminAccountModal(true);
+              }}
+              className="w-full py-1.5 px-2.5 rounded bg-white/10 hover:bg-white/20 text-teal-100 text-[11px] font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <UserPlus className="w-3 h-3 text-teal-200" />
+              <span>Customize Admin ID</span>
+            </button>
+          </div>
+
           <div className="pt-2 border-t border-white/10 text-[11px] text-teal-200 font-semibold text-center">
             Developed by Sajjad Qaiser Shah
           </div>
         </div>
       </aside>
+      )}
 
       {/* =====================================================================
-          RIGHT MAIN WORKSPACE COLUMN (SIDEBAR REMAINS VISIBLE IN FULL SCREEN)
+          RIGHT MAIN WORKSPACE COLUMN (EXPANDS TO 100% FULL SCREEN WHEN MAXIMIZED)
          ===================================================================== */}
-      <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
+      <div
+        className={`flex-1 flex flex-col h-screen print:h-auto overflow-hidden print:overflow-visible min-w-0 transition-all ${
+          isAppMinimized ? 'opacity-10 pointer-events-none scale-95' : ''
+        }`}
+      >
         {/* =====================================================================
             TOP-MOST LAPTOP WINDOW BAR (ABOVE SEARCH BAR) — ← BACK, —, □, ✕
            ===================================================================== */}
-        <div className="bg-slate-100 border-b border-slate-200 px-6 py-2 shrink-0 z-30 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5">
+        <div
+          onDoubleClick={toggleBrowserFullScreen}
+          className={`no-print border-b px-4 sm:px-6 py-2 shrink-0 z-30 flex items-center justify-between gap-3 select-none ${
+            isModuleFullScreen || isAppFullScreen
+              ? 'bg-[#1D5464] text-white border-[#16424F]'
+              : 'bg-slate-100 text-slate-900 border-slate-200'
+          }`}
+          title="Double-click title bar or click □ to toggle Full Screen"
+        >
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={handleGoBackOption}
-              className="h-8 w-8 rounded-md bg-white hover:bg-slate-200 border border-slate-300 text-slate-800 inline-flex items-center justify-center cursor-pointer transition-colors"
+              className={`h-8 w-8 rounded-md border inline-flex items-center justify-center cursor-pointer transition-colors ${
+                isModuleFullScreen || isAppFullScreen
+                  ? 'bg-white/15 hover:bg-white/25 border-white/20 text-white'
+                  : 'bg-white hover:bg-slate-200 border-slate-300 text-slate-800'
+              }`}
               title="Back (←)"
             >
               <ArrowLeft className="w-4 h-4" />
             </button>
-            <div className="text-xs sm:text-sm font-bold text-slate-900">
+            {(isModuleFullScreen || isAppFullScreen) && (
+              <button
+                type="button"
+                onClick={() => setShowSidebarInFullScreen((prev) => !prev)}
+                className="h-8 px-2.5 rounded-md bg-white/15 hover:bg-white/25 border border-white/20 text-white text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                title="Show or Hide Left Menu while in Full Screen"
+              >
+                <LayoutGrid className="w-3.5 h-3.5" />
+                <span>{showSidebarInFullScreen ? 'Hide Menu' : 'Show Menu'}</span>
+              </button>
+            )}
+            <div
+              className={`text-xs sm:text-sm font-bold truncate ${
+                isModuleFullScreen || isAppFullScreen ? 'text-white' : 'text-slate-900'
+              }`}
+            >
               {getModuleMeta(activeModule).label}
             </div>
+            {(isModuleFullScreen || isAppFullScreen) && (
+              <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-300/30 text-emerald-100 text-[10px] font-bold">
+                FULL SCREEN MODE
+              </span>
+            )}
           </div>
 
           <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={handleMinimizeCurrentOption}
-              className="h-8 w-8 rounded-md bg-white hover:bg-slate-200 border border-slate-300 text-slate-700 inline-flex items-center justify-center cursor-pointer transition-colors"
+              className={`h-8 w-8 rounded-md border inline-flex items-center justify-center cursor-pointer transition-colors ${
+                isModuleFullScreen || isAppFullScreen
+                  ? 'bg-white/15 hover:bg-white/25 border-white/20 text-white'
+                  : 'bg-white hover:bg-slate-200 border-slate-300 text-slate-700'
+              }`}
               title="Minimize (—)"
             >
               <Minus className="w-4 h-4" />
@@ -2350,17 +2724,27 @@ export default function App() {
             <button
               type="button"
               onClick={toggleBrowserFullScreen}
-              className="h-8 w-8 rounded-md bg-white hover:bg-slate-200 border border-slate-300 text-slate-700 inline-flex items-center justify-center cursor-pointer transition-colors"
+              className={`h-8 px-2.5 rounded-md border inline-flex items-center justify-center gap-1.5 cursor-pointer transition-colors text-xs font-semibold ${
+                isModuleFullScreen || isAppFullScreen
+                  ? 'bg-emerald-500 hover:bg-emerald-600 border-emerald-400 text-white shadow-xs'
+                  : 'bg-white hover:bg-slate-200 border-slate-300 text-slate-800'
+              }`}
               title={
                 isModuleFullScreen || isAppFullScreen
-                  ? 'Restore Down'
+                  ? 'Restore Down (Exit Full Screen)'
                   : 'Maximize / Full Screen'
               }
             >
               {isModuleFullScreen || isAppFullScreen ? (
-                <Minimize2 className="w-3.5 h-3.5" />
+                <>
+                  <Minimize2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Restore Down</span>
+                </>
               ) : (
-                <Maximize2 className="w-3.5 h-3.5" />
+                <>
+                  <Maximize2 className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Maximize</span>
+                </>
               )}
             </button>
             <button
@@ -2373,9 +2757,8 @@ export default function App() {
                 } else if (isModuleFullScreen || isAppFullScreen) {
                   setIsModuleFullScreen(false);
                   setIsAppFullScreen(false);
-                  if (document.fullscreenElement) {
-                    document.exitFullscreen().catch(() => {});
-                  }
+                  setShowSidebarInFullScreen(false);
+                  await requestOrExitNativeBrowserFullScreen(false);
                 }
               }}
               className="h-8 w-8 rounded-md bg-rose-600 hover:bg-rose-700 text-white inline-flex items-center justify-center cursor-pointer transition-colors"
@@ -2386,115 +2769,97 @@ export default function App() {
           </div>
         </div>
 
-        {/* TOP WHITE HEADER BAR (SEARCH & QUICK ACTIONS) */}
-        <header className="bg-white border-b border-slate-200/80 px-6 py-3 shrink-0 z-30 flex flex-wrap items-center justify-between gap-4">
+        {/* TOP WHITE HEADER BAR (SEARCH & AUTOMATIC DAILY PATIENTS, STAFF ATTENDANCE & MEDICINE STOCK SUMMARY) */}
+        <header
+          className={`no-print bg-white border-b border-slate-200/80 shrink-0 z-30 flex flex-wrap items-center justify-between gap-3 ${
+            isModuleFullScreen || isAppFullScreen ? 'px-4 py-1.5' : 'px-6 py-3'
+          }`}
+        >
           {/* Left: Search Input Box */}
-          <div className="relative flex-1 max-w-md">
+          <div className="relative flex-1 min-w-[260px] max-w-md">
             <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={globalSearchQuery}
               onChange={(e) => setGlobalSearchQuery(e.target.value)}
-              placeholder="Search people, medicines, invoices, staff, or dates..."
+              placeholder="Search staff name, absent dates, patients, medicines, or YYYY-MM-DD..."
               className="w-full pl-10 pr-4 py-2 rounded-lg bg-[#F1F5F8] text-xs text-slate-800 placeholder-slate-400 border border-transparent focus:border-[#1D5464]/30 focus:bg-white focus:outline-none transition-all"
             />
           </div>
 
-          {/* Right Header Controls: Total People Quick Summary, PIN Controls, Login / Logout */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="px-3 py-1.5 rounded-lg bg-[#F1F5F8] text-slate-700 text-xs font-semibold flex items-center gap-2">
+          {/* Right Header Controls: Auto-Updating Daily Patients, Staff Attendance (Hazir/Absent) & Medicine Stock */}
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-700 font-semibold">
+              <Calendar className="w-3.5 h-3.5 text-[#1D5464]" />
+              <span>Date:</span>
+              <input
+                type="date"
+                value={attendanceDate}
+                onChange={(e) => setAttendanceDate(e.target.value || '2026-10-10')}
+                className="bg-transparent font-mono font-bold text-slate-900 focus:outline-none cursor-pointer"
+                title="Select Date to view or mark Daily Patients & Staff Attendance"
+              />
+            </div>
+
+            <button
+              type="button"
+              onClick={() => navigateToOption('clinical')}
+              className="px-3 py-1.5 rounded-lg bg-[#F1F5F8] hover:bg-slate-200/80 border border-slate-200/80 text-slate-800 font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+              title={`Patients on ${selectedDayStr}: ${dailyPatientNames.join(', ') || 'None'} (Total Registered: ${patients.length})`}
+            >
               <Users className="w-3.5 h-3.5 text-[#1D5464]" />
-              <span>Patients: {patients.length}</span>
+              <span>
+                Patients ({selectedDayStr}):{' '}
+                <strong className="text-[#1D5464]">{dailyPatientNames.length} Hazir</strong>
+              </span>
+              <span className="text-slate-400 text-[11px]">(Total: {patients.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => navigateToOption('billing_hr')}
+              className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100/80 border border-emerald-200 text-slate-800 font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+              title="Click to open Staff Attendance (Hazir / Ghair Hazir) & Salary System"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700" />
+              <span>
+                Staff ({selectedDayStr}):{' '}
+                <strong className="text-emerald-700">
+                  {dailyPresentStaffList.length} Present
+                </strong>
+              </span>
               <span className="text-slate-300">|</span>
-              <span>Staff: {employees.length}</span>
-              <span className="text-slate-300">|</span>
-              <span>Medicines: {pharmacyBatches.length}</span>
-            </div>
-
-            <button
-              type="button"
-              onClick={() => {
-                setIsAdminModalMinimized(false);
-                setShowAdminAccountModal(true);
-              }}
-              className="px-3 py-1.5 rounded-lg bg-[#F1F5F8] hover:bg-slate-200 text-slate-800 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-            >
-              <UserPlus className="w-3.5 h-3.5 text-[#1D5464]" />
-              <span>Customize Admin ID</span>
+              <span className="text-rose-700 font-bold">
+                {dailyAbsentStaffList.length} Absent
+              </span>
+              <span className="text-slate-400 text-[11px]">(Total: {employees.length})</span>
             </button>
 
             <button
               type="button"
-              onClick={() => {
-                setOldPinInput('');
-                setNewPinInput('');
-                setConfirmNewPinInput('');
-                setPinModalError('');
-                setIsChangePinMinimized(false);
-                setShowChangePinModal(true);
-              }}
-              className="px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
+              onClick={() => navigateToOption('pharmacy')}
+              className="px-3 py-1.5 rounded-lg bg-[#F1F5F8] hover:bg-slate-200/80 border border-slate-200/80 text-slate-800 font-semibold flex items-center gap-1.5 cursor-pointer transition-colors"
+              title="4 Medicine Types/Batches in Pharmacy Inventory with total available units"
             >
-              <KeyRound className="w-3.5 h-3.5 text-[#1D5464]" />
-              <span>Change PIN (••••)</span>
+              <Pill className="w-3.5 h-3.5 text-[#1D5464]" />
+              <span>
+                Medicines: <strong>{pharmacyBatches.length} Types</strong>
+              </span>
+              <span className="text-slate-400 text-[11px]">
+                ({totalMedicineUnitsInStock} Stock Units)
+              </span>
             </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setIsLockModalMinimized(false);
-                setIsLocked(true);
-              }}
-              className="px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center gap-1.5 cursor-pointer"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Login / Logout</span>
-            </button>
-
-            {/* User Profile & Active Role Selector */}
-            <div className="flex items-center gap-2.5 pl-2 border-l border-slate-200">
-              <button
-                type="button"
-                onClick={() => setShowAdminAccountModal(true)}
-                title="Click to customize Admin Name, Email & Login ID"
-                className="w-8 h-8 rounded-full bg-[#1D5464] text-white font-bold text-xs flex items-center justify-center shrink-0 cursor-pointer"
-              >
-                {(loggedInStaffName || 'AD').slice(0, 2).toUpperCase()}
-              </button>
-              <div className="text-left">
-                <div className="text-xs font-bold text-slate-900 leading-tight">
-                  {loggedInStaffName}
-                </div>
-                <div className="flex items-center gap-1">
-                  <select
-                    value={activeRole}
-                    onChange={(e) => setActiveRole(e.target.value as StaffRole)}
-                    className="text-[11px] text-slate-500 bg-transparent font-medium cursor-pointer focus:outline-none"
-                  >
-                    <option value="ADMIN">Admin ({loggedInStaffEmail})</option>
-                    <option value="PHARMACIST">Pharmacist</option>
-                    <option value="CASHIER">Cashier</option>
-                    <option value="LAB_TECH">Lab Tech</option>
-                    <option value="ACCOUNTANT">Accountant</option>
-                    <option value="HR_MANAGER">HR Manager</option>
-                    <option value="DOCTOR">Doctor</option>
-                    <option value="NURSE">Nurse</option>
-                    <option value="COOK">Cook / Kitchen</option>
-                    <option value="SWEEPER">Cleaner / Sweeper</option>
-                    <option value="OTHER">Other Staff</option>
-                  </select>
-                </div>
-              </div>
-            </div>
           </div>
         </header>
 
         {/* Scrollable Workspace Content Area */}
-        <div className="flex-1 overflow-y-auto flex flex-col">
+        <div className="flex-1 overflow-y-auto print:overflow-visible flex flex-col">
           <div
-            className={`flex-1 mx-auto w-full ${
-              isModuleFullScreen || isAppFullScreen ? 'max-w-none' : 'max-w-[1400px]'
-            } px-4 sm:px-7 py-6`}
+            className={`app-workspace-content no-print flex-1 mx-auto w-full ${
+              isModuleFullScreen || isAppFullScreen
+                ? 'max-w-none px-3 sm:px-5 py-3'
+                : 'max-w-[1400px] px-4 sm:px-7 py-6'
+            }`}
           >
             <div className="space-y-6">
               {/* Notification Banner */}
@@ -2525,6 +2890,160 @@ export default function App() {
               )}
 
               {/* =====================================================================
+                  LIVE SEARCH RESULTS: STAFF ATTENDANCE (PRESENT / ABSENT DATES & MONTHLY CHUTTIYAN)
+                 ===================================================================== */}
+              {globalSearchQuery.trim() !== '' && (
+                <div className="bg-white border-2 border-[#1D5464]/30 rounded-xl p-4 shadow-xs space-y-3 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-200">
+                    <div className="flex items-center gap-2">
+                      <Search className="w-4 h-4 text-[#1D5464]" />
+                      <span className="font-bold text-slate-900 text-sm">
+                        Search Results — Staff Attendance (Present / Absent Dates &amp; Monthly Chuttiyan): &ldquo;{globalSearchQuery}&rdquo;
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => navigateToOption('billing_hr')}
+                        className="px-2.5 py-1 rounded bg-[#1D5464] text-white font-semibold cursor-pointer"
+                      >
+                        Open Staff Attendance &amp; Salary
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setGlobalSearchQuery('')}
+                        className="px-2.5 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold cursor-pointer"
+                      >
+                        Clear Search
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-500">
+                          <th className="py-2 font-semibold">Staff Member &amp; Role</th>
+                          <th className="py-2 font-semibold">
+                            Month ({selectedMonthStr}) Present / Chuttiyan
+                          </th>
+                          <th className="py-2 font-semibold">
+                            Month-Wise Total Chuttiyan Breakdown
+                          </th>
+                          <th className="py-2 font-semibold">
+                            Exact Absent Dates (Kis Din Absent Thay)
+                          </th>
+                          <th className="py-2 font-semibold">
+                            Exact Present Dates (Kis Din Present Thay)
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {employees
+                          .filter((emp) => {
+                            const q = globalSearchQuery.trim().toLowerCase();
+                            const summary = getEmployeeAttendanceSummary(
+                              emp.id,
+                              selectedMonthStr
+                            );
+                            if (
+                              emp.fullName.toLowerCase().includes(q) ||
+                              emp.designation.toLowerCase().includes(q) ||
+                              emp.empCode.toLowerCase().includes(q) ||
+                              emp.department.toLowerCase().includes(q) ||
+                              q.includes('absent') ||
+                              q.includes('present') ||
+                              q.includes('chutti') ||
+                              q.includes('hazir') ||
+                              q.includes('staff')
+                            ) {
+                              return true;
+                            }
+                            return (
+                              summary.allTimeAbsentDates.some((d) => d.includes(q)) ||
+                              summary.allTimePresentDates.some((d) => d.includes(q))
+                            );
+                          })
+                          .map((emp) => {
+                            const sum = getEmployeeAttendanceSummary(
+                              emp.id,
+                              selectedMonthStr
+                            );
+                            return (
+                              <tr key={emp.id} className="hover:bg-slate-50">
+                                <td className="py-2.5 pr-3">
+                                  <div className="font-bold text-slate-900">{emp.fullName}</div>
+                                  <div className="text-slate-500">
+                                    {emp.empCode} · {emp.designation}
+                                  </div>
+                                </td>
+                                <td className="py-2.5 pr-3 font-mono">
+                                  <span className="text-emerald-700 font-bold">
+                                    Present: {sum.monthPresentCount}d
+                                  </span>{' '}
+                                  |{' '}
+                                  <span className="text-rose-700 font-bold">
+                                    Absent (Chutti): {sum.monthAbsentCount}d
+                                  </span>
+                                </td>
+                                <td className="py-2.5 pr-3">
+                                  <div className="font-bold text-slate-900">
+                                    Total All-Time Chuttiyan: {sum.allTimeAbsentCount} Days (Present: {sum.allTimePresentCount} Days)
+                                  </div>
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {sum.monthlyBreakdown.map((mb) => (
+                                      <span
+                                        key={mb.month}
+                                        className="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 font-mono text-[11px]"
+                                      >
+                                        {mb.month}: {mb.presentCount}P /{' '}
+                                        <strong className="text-rose-700">
+                                          {mb.absentCount} Chutti
+                                        </strong>
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="py-2.5 pr-3">
+                                  {sum.allTimeAbsentDates.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {sum.allTimeAbsentDates.map((d) => (
+                                        <span
+                                          key={d}
+                                          className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-200 font-mono font-bold text-[11px]"
+                                        >
+                                          Absent: {d}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-emerald-700 font-semibold">
+                                      0 Absences (Regular Present)
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2.5">
+                                  <div className="flex flex-wrap gap-1">
+                                    {sum.allTimePresentDates.map((d) => (
+                                      <span
+                                        key={d}
+                                        className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200 font-mono text-[11px]"
+                                      >
+                                        Present: {d}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* =====================================================================
                   MODULE 0: CONSOLIDATED PROFIT & LOSS HOME DASHBOARD
                  ===================================================================== */}
               {activeModule === 'home' && (
@@ -2543,6 +3062,36 @@ export default function App() {
                   expenses={expenses}
                   searchQuery={globalSearchQuery}
                   onNavigateModule={(mod) => navigateToOption(mod)}
+                />
+              )}
+
+              {/* =====================================================================
+                  MODULE 0B: DEDICATED PATIENT BILL BUILDER (CUSTOMER DETAIL + DOCTOR FEE + LAB TESTS + MEDICINES FROM STOCK + EXTRA DRIP/INJECTION + VIRTUAL/PRINTER BILL)
+                 ===================================================================== */}
+              {activeModule === 'patient_billing' && (
+                <PatientBillBuilderView
+                  currency={cur}
+                  defaultDate={selectedDayStr}
+                  doctors={doctors}
+                  patients={patients}
+                  encounters={encounters}
+                  labOrders={labOrders}
+                  pharmacyBatches={pharmacyBatches}
+                  invoices={invoices}
+                  globalSearchQuery={globalSearchQuery}
+                  onSubmitCombinedBill={handleCreateCombinedPatientBill}
+                  onOpenPrintableInvoice={(inv) =>
+                    setPrintableDoc({ type: 'INVOICE', data: inv })
+                  }
+                  onDirectHardwarePrint={(inv, layout) => {
+                    setPrintableDoc({ type: 'INVOICE', data: inv });
+                    printViaConnectedPrinter({ type: 'INVOICE', data: inv }, settings, layout || 'A4');
+                  }}
+                  onReturnMedicineSale={(inv) => handleReturnPharmacySale(inv)}
+                  onDeleteInvoice={(inv) =>
+                    handleDeleteRecord('invoice', inv.id, `Patient Bill ${inv.invoiceNo}`)
+                  }
+                  onNavigateToPharmacyStore={() => navigateToOption('pharmacy')}
                 />
               )}
 
@@ -3100,8 +3649,8 @@ export default function App() {
                             </div>
                           </div>
 
-                          <div className="h-64 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
+                          <div className="h-64 w-full min-w-0">
+                            <ResponsiveContainer width="100%" height={250} minWidth={100} minHeight={200}>
                               <LineChart
                                 data={chronologicalChartData}
                                 margin={{ top: 10, right: 20, left: 0, bottom: 5 }}
@@ -3565,7 +4114,30 @@ export default function App() {
                             <td className="py-2.5 font-mono text-slate-700 whitespace-nowrap">
                               {p.registeredBusinessDate}
                             </td>
-                            <td className="py-2.5 text-right whitespace-nowrap">
+                            <td className="py-2.5 text-right whitespace-nowrap space-x-1.5">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setPrintableDoc(patientRegistrationToPrintableInvoice(p))
+                                }
+                                className="px-2.5 py-1 text-xs font-medium text-slate-800 border border-slate-300 rounded hover:bg-slate-100 inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <Printer className="w-3 h-3" />
+                                <span>Print Slip</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const doc = patientRegistrationToPrintableInvoice(p);
+                                  setPrintableDoc(doc);
+                                  printViaConnectedPrinter(doc, settings, 'A4');
+                                }}
+                                className="px-2 py-1 text-xs font-semibold text-white bg-[#1D5464] hover:bg-[#16424F] rounded inline-flex items-center gap-1 cursor-pointer"
+                                title="Send directly to connected printer"
+                              >
+                                <Printer className="w-3 h-3" />
+                                <span>Printer</span>
+                              </button>
                               <button
                                 type="button"
                                 onClick={() =>
@@ -3687,12 +4259,31 @@ export default function App() {
                               type="button"
                               onClick={() => {
                                 const inv = invoices.find((i) => i.id === enc.invoiceId);
-                                if (inv) setPrintableDoc({ type: 'INVOICE', data: inv });
+                                const doc: PrintableDocPayload = inv
+                                  ? { type: 'INVOICE', data: inv }
+                                  : encounterToFallbackInvoice(enc);
+                                setPrintableDoc(doc);
                               }}
                               className="px-2.5 py-1 text-xs font-medium text-slate-700 border border-slate-200 rounded hover:bg-slate-100 inline-flex items-center gap-1 cursor-pointer"
                             >
                               <Printer className="w-3 h-3" />
                               <span>Receipt</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const inv = invoices.find((i) => i.id === enc.invoiceId);
+                                const doc: PrintableDocPayload = inv
+                                  ? { type: 'INVOICE', data: inv }
+                                  : encounterToFallbackInvoice(enc);
+                                setPrintableDoc(doc);
+                                printViaConnectedPrinter(doc, settings, 'A4');
+                              }}
+                              className="px-2 py-1 text-xs font-semibold text-white bg-[#1D5464] hover:bg-[#16424F] rounded inline-flex items-center gap-1 cursor-pointer"
+                              title="Direct print on connected printer"
+                            >
+                              <Printer className="w-3 h-3" />
+                              <span>Printer</span>
                             </button>
                             <button
                               type="button"
@@ -3909,6 +4500,19 @@ export default function App() {
                               </span>
                               <button
                                 type="button"
+                                onClick={() => {
+                                  const doc: PrintableDocPayload = { type: 'LAB_REPORT', data: o };
+                                  setPrintableDoc(doc);
+                                  printViaConnectedPrinter(doc, settings, 'A4');
+                                }}
+                                className="px-2 py-1 text-xs font-semibold text-white bg-[#1D5464] hover:bg-[#16424F] rounded inline-flex items-center gap-1 cursor-pointer"
+                                title="Print Lab Slip / Report on Connected Printer"
+                              >
+                                <Printer className="w-3 h-3" />
+                                <span>Printer</span>
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() =>
                                   handleDeleteRecord('lab-order', o.id, `Lab Order ${o.orderNo}`)
                                 }
@@ -4016,18 +4620,26 @@ export default function App() {
           {activeModule === 'pharmacy' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* 1. Pharmacy Retail POS Counter (Hospital Retail Only) */}
+                {/* 1. Pharmacy Retail POS Counter (Separate Medical Store Counter — Medicines Only) */}
                 <div className="lg:col-span-5 bg-white border border-slate-200 rounded-lg p-5">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <h2 className="text-base font-bold text-slate-900">
-                      01. Hospital Pharmacy Retail POS
+                      01. Medical Store POS (Only Medicines Counter)
                     </h2>
-                    <span className="px-2.5 py-1 text-[11px] font-bold rounded bg-emerald-100 text-emerald-800">
-                      Retail Sale Only
+                    <span className="px-2.5 py-1 text-[11px] font-bold rounded bg-emerald-100 text-emerald-800 whitespace-nowrap">
+                      Medical Store Only
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 mt-1">
-                    Automatically deducts sold quantity from stock, calculates profit against supplier wholesale cost, and prints customer receipt
+                    Separate counter for customers buying ONLY medicines from the Medical Store. For full Hospital Patient Bills (Doctor Fee + Lab Test + Medicine + Drip/Injection), use{' '}
+                    <button
+                      type="button"
+                      onClick={() => navigateToOption('patient_billing')}
+                      className="text-[#1D5464] font-bold underline cursor-pointer"
+                    >
+                      Make Patient Bill
+                    </button>
+                    .
                   </p>
 
                   <form onSubmit={handleCheckoutPos} className="mt-4 space-y-3 text-xs">
@@ -4670,7 +5282,20 @@ export default function App() {
                                 className="px-2.5 py-1 text-xs font-medium text-slate-800 border border-slate-300 rounded hover:bg-slate-100 inline-flex items-center gap-1 cursor-pointer"
                               >
                                 <Printer className="w-3 h-3" />
-                                <span>Print</span>
+                                <span>View / Virtual</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const doc: PrintableDocPayload = { type: 'INVOICE', data: inv };
+                                  setPrintableDoc(doc);
+                                  printViaConnectedPrinter(doc, settings, 'A4');
+                                }}
+                                className="px-2.5 py-1 text-xs font-semibold text-white bg-[#1D5464] hover:bg-[#16424F] rounded inline-flex items-center gap-1 cursor-pointer"
+                                title="Send directly to connected printer"
+                              >
+                                <Printer className="w-3 h-3" />
+                                <span>Printer</span>
                               </button>
                               <button
                                 type="button"
@@ -4807,6 +5432,27 @@ export default function App() {
                                 FULLY PAID
                               </span>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => setPrintableDoc(supplierBillToPrintableInvoice(sb))}
+                              className="px-2 py-1 text-xs font-medium text-slate-800 border border-slate-300 rounded hover:bg-slate-100 inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <Printer className="w-3 h-3" />
+                              <span>Print Bill</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const doc = supplierBillToPrintableInvoice(sb);
+                                setPrintableDoc(doc);
+                                printViaConnectedPrinter(doc, settings, 'A4');
+                              }}
+                              className="px-2 py-1 text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 rounded inline-flex items-center gap-1 cursor-pointer"
+                              title="Direct print supplier bill on connected printer"
+                            >
+                              <Printer className="w-3 h-3" />
+                              <span>Printer</span>
+                            </button>
                             <button
                               type="button"
                               onClick={() =>
@@ -5031,18 +5677,35 @@ export default function App() {
                 </div>
               </div>
 
-              {/* Row 2: Staff Management, Add New Staff & Pay Staff Salaries (Integrated with P&L) */}
+              {/* Row 2: Staff Management, Daily Attendance (Hazir / Ghair Hazir), Monthly Chuttiyan & Salary System */}
               <div className="bg-white border border-slate-200 rounded-lg p-5 space-y-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
                   <div>
                     <h3 className="text-base font-bold text-slate-900">
-                      03. Hospital Staff Directory, Add New Staff &amp; Salary Payment System
+                      03. Hospital Staff Directory, Daily Attendance (Hazri / Chuttiyan) &amp; Salary System
                     </h3>
                     <p className="text-xs text-slate-500">
-                      Add hospital staff members, pay individual or monthly salaries, save in Salary History, and automatically deduct paid salaries from Hospital Profit &amp; Loss
+                      Mark daily Present (Hazir) or Absent (Ghair Hazir / Chutti), track monthly &amp; total chuttiyan in History, and pay staff salaries
                     </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                    <div className="flex items-center gap-1.5 h-10 px-3 border border-slate-300 rounded-lg bg-slate-50 text-xs">
+                      <span className="font-semibold text-slate-600">Attendance Date:</span>
+                      <input
+                        type="date"
+                        value={attendanceDate}
+                        onChange={(e) => setAttendanceDate(e.target.value || '2026-10-10')}
+                        className="font-mono font-bold text-slate-900 bg-transparent focus:outline-none cursor-pointer"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleSaveDailyAttendanceBatch(selectedDayStr, false)}
+                      className="h-10 px-3.5 text-xs font-semibold text-white bg-emerald-700 rounded-lg hover:bg-emerald-800 transition-colors cursor-pointer whitespace-nowrap inline-flex items-center justify-center gap-1.5 shadow-xs"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>Save Attendance ({selectedDayStr})</span>
+                    </button>
                     <input
                       type="month"
                       value={payrollMonth}
@@ -5058,6 +5721,30 @@ export default function App() {
                       <span>Pay All Staff ({payrollMonth})</span>
                     </button>
                   </div>
+                </div>
+
+                {/* Daily Attendance Summary Banner for Selected Date */}
+                <div className="p-3.5 rounded-xl bg-emerald-50/70 border border-emerald-200 flex flex-wrap items-center justify-between gap-3 text-xs">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="font-bold text-slate-900">
+                      Daily Attendance Status ({selectedDayStr}):
+                    </span>
+                    <span className="px-2.5 py-1 rounded-md bg-emerald-100 text-emerald-900 font-bold">
+                      Present (Hazir): {dailyPresentStaffList.length} Staff (
+                      {dailyPresentStaffList.map((e) => e.fullName).join(', ') || 'None'})
+                    </span>
+                    <span className="px-2.5 py-1 rounded-md bg-rose-100 text-rose-900 font-bold">
+                      Absent / Chutti (Ghair Hazir): {dailyAbsentStaffList.length} Staff (
+                      {dailyAbsentStaffList.map((e) => e.fullName).join(', ') || 'None'})
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSaveDailyAttendanceBatch(selectedDayStr, true)}
+                    className="px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 border border-emerald-300 text-emerald-900 font-semibold cursor-pointer"
+                  >
+                    Mark All Present on {selectedDayStr}
+                  </button>
                 </div>
 
                 {/* Add New Staff Member Form (With Cook, Sweeper, Guard, Driver & Custom Role Option) */}
@@ -5185,18 +5872,18 @@ export default function App() {
                 </form>
 
                 <div className="grid grid-cols-1 2xl:grid-cols-2 gap-6">
-                  {/* Active Staff Roster with Search, Total Count, Pay Salary & Delete */}
+                  {/* Active Staff Roster with Search, Daily Attendance (Hazir/Absent), Monthly Chuttiyan, Pay Salary & Delete */}
                   <div>
                     <div className="flex flex-wrap items-center justify-between gap-2.5 mb-3">
                       <div className="text-xs font-bold text-slate-800">
-                        Active Hospital Staff List (Total Staff: {employees.length})
+                        Active Hospital Staff List &amp; Attendance (Total Staff: {employees.length})
                       </div>
                       <input
                         type="text"
                         value={staffSearch}
                         onChange={(e) => setStaffSearch(e.target.value)}
-                        placeholder="Search staff name or role..."
-                        className="h-9 px-3 border border-slate-300 rounded-lg text-xs text-slate-900 w-52 bg-white focus:outline-none focus:border-[#1D5464]"
+                        placeholder="Search staff name, role, or absent date..."
+                        className="h-9 px-3 border border-slate-300 rounded-lg text-xs text-slate-900 w-60 bg-white focus:outline-none focus:border-[#1D5464]"
                       />
                     </div>
                     <div className="overflow-x-auto">
@@ -5204,7 +5891,12 @@ export default function App() {
                         <thead>
                           <tr className="border-b border-slate-200 text-slate-500">
                             <th className="py-2 font-medium">Staff Name &amp; Role</th>
-                            <th className="py-2 font-medium">Dept</th>
+                            <th className="py-2 font-medium">
+                              Hazri ({selectedDayStr})
+                            </th>
+                            <th className="py-2 font-medium">
+                              Month ({selectedMonthStr}) &amp; Total Chuttiyan
+                            </th>
                             <th className="py-2 font-medium text-right">Monthly Salary</th>
                             <th className="py-2 font-medium text-right">Action</th>
                           </tr>
@@ -5214,63 +5906,123 @@ export default function App() {
                             .filter((emp) => {
                               const q = (staffSearch || globalSearchQuery).trim().toLowerCase();
                               if (!q) return true;
+                              const sum = getEmployeeAttendanceSummary(emp.id, selectedMonthStr);
                               return (
                                 emp.fullName.toLowerCase().includes(q) ||
                                 emp.designation.toLowerCase().includes(q) ||
                                 emp.department.toLowerCase().includes(q) ||
-                                emp.empCode.toLowerCase().includes(q)
+                                emp.empCode.toLowerCase().includes(q) ||
+                                sum.allTimeAbsentDates.some((d) => d.includes(q)) ||
+                                sum.allTimePresentDates.some((d) => d.includes(q))
                               );
                             })
-                            .map((emp) => (
-                            <tr key={emp.id} className="hover:bg-slate-50">
-                              <td className="py-2.5">
-                                <div className="font-semibold text-slate-900">
-                                  {emp.fullName}
-                                </div>
-                                <div className="text-slate-500">
-                                  {emp.empCode} · {emp.designation}
-                                </div>
-                              </td>
-                              <td className="py-2.5 font-mono text-slate-600">
-                                {emp.department}
-                              </td>
-                              <td className="py-2.5 text-right font-mono tabular-nums font-bold text-slate-900">
-                                {emp.netSalary.toLocaleString()} {cur}
-                              </td>
-                              <td className="py-2.5 text-right whitespace-nowrap">
-                                <div className="inline-flex items-center justify-end gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() => handlePayIndividualSalary(emp)}
-                                    className="h-8 px-3 text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 rounded-md cursor-pointer inline-flex items-center justify-center gap-1.5"
-                                  >
-                                    <Wallet className="w-3.5 h-3.5 shrink-0" />
-                                    <span>Pay Salary</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleDeleteRecord('employee', emp.id, `Staff ${emp.fullName}`)
-                                    }
-                                    className="h-8 px-2.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md inline-flex items-center justify-center gap-1 cursor-pointer"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                                    <span>Delete</span>
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
+                            .map((emp) => {
+                              const todayStatus = getStaffStatusOnDate(emp.id, selectedDayStr);
+                              const attSum = getEmployeeAttendanceSummary(
+                                emp.id,
+                                selectedMonthStr
+                              );
+                              return (
+                                <tr key={emp.id} className="hover:bg-slate-50">
+                                  <td className="py-2.5 pr-2">
+                                    <div className="font-semibold text-slate-900">
+                                      {emp.fullName}
+                                    </div>
+                                    <div className="text-slate-500">
+                                      {emp.empCode} · {emp.designation} ({emp.department})
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 pr-2 whitespace-nowrap">
+                                    <div className="inline-flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleMarkStaffAttendance(emp, 'PRESENT', selectedDayStr)
+                                        }
+                                        className={`h-7 px-2.5 rounded text-[11px] font-bold cursor-pointer transition-colors ${
+                                          todayStatus === 'PRESENT'
+                                            ? 'bg-emerald-600 text-white shadow-xs'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700'
+                                        }`}
+                                      >
+                                        ✓ Present (Hazir)
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleMarkStaffAttendance(emp, 'ABSENT', selectedDayStr)
+                                        }
+                                        className={`h-7 px-2.5 rounded text-[11px] font-bold cursor-pointer transition-colors ${
+                                          todayStatus !== 'PRESENT'
+                                            ? 'bg-rose-600 text-white shadow-xs'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-rose-50 hover:text-rose-700'
+                                        }`}
+                                      >
+                                        ✕ Absent (Chutti)
+                                      </button>
+                                    </div>
+                                  </td>
+                                  <td className="py-2.5 pr-2">
+                                    <div className="font-mono text-[11px]">
+                                      <span className="text-emerald-700 font-bold">
+                                        {selectedMonthStr} Present: {attSum.monthPresentCount}d
+                                      </span>{' '}
+                                      ·{' '}
+                                      <span className="text-rose-700 font-bold">
+                                        Chuttiyan: {attSum.monthAbsentCount}d
+                                      </span>
+                                    </div>
+                                    <div className="text-[11px] text-slate-600 font-semibold mt-0.5">
+                                      Total All-Time Chuttiyan: {attSum.allTimeAbsentCount}d (Present: {attSum.allTimePresentCount}d)
+                                    </div>
+                                    {attSum.allTimeAbsentDates.length > 0 && (
+                                      <div className="text-[10px] font-mono text-rose-700 mt-0.5">
+                                        Absent Dates: {attSum.allTimeAbsentDates.join(', ')}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="py-2.5 text-right font-mono tabular-nums font-bold text-slate-900 whitespace-nowrap">
+                                    {emp.netSalary.toLocaleString()} {cur}
+                                  </td>
+                                  <td className="py-2.5 text-right whitespace-nowrap">
+                                    <div className="inline-flex items-center justify-end gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => handlePayIndividualSalary(emp)}
+                                        className="h-8 px-3 text-xs font-semibold text-white bg-emerald-700 hover:bg-emerald-800 rounded-md cursor-pointer inline-flex items-center justify-center gap-1.5"
+                                      >
+                                        <Wallet className="w-3.5 h-3.5 shrink-0" />
+                                        <span>Pay Salary</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleDeleteRecord(
+                                            'employee',
+                                            emp.id,
+                                            `Staff ${emp.fullName}`
+                                          )
+                                        }
+                                        className="h-8 px-2.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md inline-flex items-center justify-center gap-1 cursor-pointer"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                                        <span>Delete</span>
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
                         </tbody>
                       </table>
                     </div>
                   </div>
 
-                  {/* Saved Salary Payment History with Delete Option */}
+                  {/* Saved Salary Payment History with Attendance Summary & Delete Option */}
                   <div>
                     <div className="flex items-center justify-between min-h-9 mb-3">
                       <div className="text-xs font-bold text-slate-800">
-                        Paid Salary History (Total Paid Slips: {salarySlips.length})
+                        Paid Salary History &amp; Staff Attendance Summary (Total Slips: {salarySlips.length})
                       </div>
                     </div>
                     <div className="overflow-x-auto">
@@ -5279,6 +6031,7 @@ export default function App() {
                           <tr className="border-b border-slate-200 text-slate-500">
                             <th className="py-2 font-medium">Date / Month</th>
                             <th className="py-2 font-medium">Staff Member</th>
+                            <th className="py-2 font-medium">Month Attendance (Present / Absent)</th>
                             <th className="py-2 font-medium text-right">Paid ({cur})</th>
                             <th className="py-2 font-medium text-right">Actions</th>
                           </tr>
@@ -5294,52 +6047,309 @@ export default function App() {
                                 s.payrollMonth.toLowerCase().includes(q)
                               );
                             })
-                            .map((s) => (
-                            <tr key={s.id} className="hover:bg-slate-50">
-                              <td className="py-2.5 font-mono text-slate-800">
-                                <div className="font-semibold">{s.businessDate}</div>
-                                <div className="text-slate-500">{s.payrollMonth}</div>
-                              </td>
-                              <td className="py-2.5">
-                                <div className="font-semibold text-slate-900">{s.employeeName}</div>
-                                <div className="text-slate-500">{s.designation}</div>
-                              </td>
-                              <td className="py-2.5 text-right font-mono tabular-nums font-bold text-rose-700">
-                                -{s.netPaid.toLocaleString()}
-                              </td>
-                              <td className="py-2.5 text-right whitespace-nowrap">
-                                <div className="inline-flex items-center justify-end gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      setPrintableDoc({ type: 'SALARY_SLIP', data: s })
-                                    }
-                                    className="h-8 px-2.5 text-xs font-medium text-slate-800 border border-slate-300 rounded-md hover:bg-slate-100 inline-flex items-center justify-center gap-1 cursor-pointer"
-                                  >
-                                    <Printer className="w-3.5 h-3.5 shrink-0" />
-                                    <span>Slip</span>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() =>
-                                      handleDeleteRecord(
-                                        'salary-slip',
-                                        s.id,
-                                        `Salary payment for ${s.employeeName}`
-                                      )
-                                    }
-                                    className="h-8 px-2.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md inline-flex items-center justify-center gap-1 cursor-pointer"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5 shrink-0" />
-                                    <span>Delete</span>
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
+                            .map((s) => {
+                              const slipAtt = getEmployeeAttendanceSummary(
+                                s.employeeId,
+                                s.payrollMonth
+                              );
+                              return (
+                                <tr key={s.id} className="hover:bg-slate-50">
+                                  <td className="py-2.5 font-mono text-slate-800">
+                                    <div className="font-semibold">{s.businessDate}</div>
+                                    <div className="text-slate-500">{s.payrollMonth}</div>
+                                  </td>
+                                  <td className="py-2.5">
+                                    <div className="font-semibold text-slate-900">
+                                      {s.employeeName}
+                                    </div>
+                                    <div className="text-slate-500">{s.designation}</div>
+                                  </td>
+                                  <td className="py-2.5 font-mono text-[11px]">
+                                    <div>
+                                      <span className="text-emerald-700 font-bold">
+                                        Present: {slipAtt.monthPresentCount}d
+                                      </span>{' '}
+                                      |{' '}
+                                      <span className="text-rose-700 font-bold">
+                                        Absent: {slipAtt.monthAbsentCount}d
+                                      </span>
+                                    </div>
+                                    {slipAtt.monthAbsentDates.length > 0 && (
+                                      <div className="text-[10px] text-rose-700">
+                                        Absent on: {slipAtt.monthAbsentDates.join(', ')}
+                                      </div>
+                                    )}
+                                  </td>
+                                  <td className="py-2.5 text-right font-mono tabular-nums font-bold text-rose-700">
+                                    -{s.netPaid.toLocaleString()}
+                                  </td>
+                                  <td className="py-2.5 text-right whitespace-nowrap">
+                                    <div className="inline-flex items-center justify-end gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setPrintableDoc({ type: 'SALARY_SLIP', data: s })
+                                        }
+                                        className="h-8 px-2.5 text-xs font-medium text-slate-800 border border-slate-300 rounded-md hover:bg-slate-100 inline-flex items-center justify-center gap-1 cursor-pointer"
+                                      >
+                                        <Printer className="w-3.5 h-3.5 shrink-0" />
+                                        <span>Slip</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const doc: PrintableDocPayload = {
+                                            type: 'SALARY_SLIP',
+                                            data: s,
+                                          };
+                                          setPrintableDoc(doc);
+                                          printViaConnectedPrinter(doc, settings, 'A4');
+                                        }}
+                                        className="h-8 px-2.5 text-xs font-semibold text-white bg-[#1D5464] hover:bg-[#16424F] rounded-md inline-flex items-center justify-center gap-1 cursor-pointer"
+                                        title="Print salary slip on connected printer"
+                                      >
+                                        <Printer className="w-3.5 h-3.5 shrink-0" />
+                                        <span>Printer</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleDeleteRecord(
+                                            'salary-slip',
+                                            s.id,
+                                            `Salary payment for ${s.employeeName}`
+                                          )
+                                        }
+                                        className="h-8 px-2.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-md inline-flex items-center justify-center gap-1 cursor-pointer"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5 shrink-0" />
+                                        <span>Delete</span>
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                </div>
+
+                {/* Complete Staff Attendance & Monthly Chuttiyan History Register (Inside Staff & Salary) */}
+                <div className="pt-4 border-t border-slate-200 space-y-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h4 className="text-sm font-bold text-slate-900">
+                        03-B. Staff Attendance History, Monthly Chuttiyan &amp; Exact Absent/Present Dates
+                      </h4>
+                      <p className="text-xs text-slate-500">
+                        Automatically stores which staff member was Present (Hazir) or Absent (Ghair Hazir) on each date, monthly chuttiyan count, and total all-time absences
+                      </p>
+                    </div>
+                    <span className="text-xs font-mono font-semibold text-[#1D5464]">
+                      Total Saved Attendance Records: {staffAttendance.length}
+                    </span>
+                  </div>
+
+                  {/* Table A: Staff Month-Wise & Total Chuttiyan Breakdown */}
+                  <div className="overflow-x-auto bg-slate-50/70 border border-slate-200 rounded-lg p-3">
+                    <div className="text-xs font-bold text-slate-800 mb-2">
+                      Month-Wise &amp; Total Chuttiyan Summary (Kis Mahinay Mein Kitni Chuttiyan Aur Kis Din Absent/Present Thay)
+                    </div>
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-500">
+                          <th className="py-2 font-medium">Staff Member</th>
+                          <th className="py-2 font-medium">
+                            Selected Month ({selectedMonthStr})
+                          </th>
+                          <th className="py-2 font-medium">
+                            Month-by-Month Chuttiyan History
+                          </th>
+                          <th className="py-2 font-medium">
+                            Total All-Time Present / Chuttiyan
+                          </th>
+                          <th className="py-2 font-medium">
+                            Exact Absent Dates (Ghair Hazir Din)
+                          </th>
+                          <th className="py-2 font-medium">
+                            Exact Present Dates (Hazir Din)
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200/60">
+                        {employees
+                          .filter((emp) => {
+                            const q = (staffSearch || globalSearchQuery).trim().toLowerCase();
+                            if (!q) return true;
+                            const sum = getEmployeeAttendanceSummary(emp.id, selectedMonthStr);
+                            return (
+                              emp.fullName.toLowerCase().includes(q) ||
+                              emp.designation.toLowerCase().includes(q) ||
+                              emp.empCode.toLowerCase().includes(q) ||
+                              sum.allTimeAbsentDates.some((d) => d.includes(q)) ||
+                              sum.allTimePresentDates.some((d) => d.includes(q))
+                            );
+                          })
+                          .map((emp) => {
+                            const sum = getEmployeeAttendanceSummary(emp.id, selectedMonthStr);
+                            return (
+                              <tr key={emp.id} className="hover:bg-white">
+                                <td className="py-2.5 pr-3">
+                                  <div className="font-bold text-slate-900">{emp.fullName}</div>
+                                  <div className="text-slate-500">
+                                    {emp.empCode} · {emp.designation}
+                                  </div>
+                                </td>
+                                <td className="py-2.5 pr-3 font-mono">
+                                  <span className="text-emerald-700 font-bold">
+                                    {sum.monthPresentCount} Present
+                                  </span>{' '}
+                                  /{' '}
+                                  <span className="text-rose-700 font-bold">
+                                    {sum.monthAbsentCount} Chuttiyan
+                                  </span>
+                                </td>
+                                <td className="py-2.5 pr-3">
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {sum.monthlyBreakdown.map((m) => (
+                                      <span
+                                        key={m.month}
+                                        className="px-2 py-0.5 rounded bg-white border border-slate-200 font-mono text-[11px]"
+                                      >
+                                        <strong>{m.month}</strong>: {m.presentCount} Present ·{' '}
+                                        <span className="text-rose-700 font-bold">
+                                          {m.absentCount} Chuttiyan
+                                        </span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
+                                <td className="py-2.5 pr-3 font-mono font-bold">
+                                  <span className="text-emerald-700">
+                                    Total Present: {sum.allTimePresentCount}d
+                                  </span>{' '}
+                                  |{' '}
+                                  <span className="text-rose-700">
+                                    Total Chuttiyan: {sum.allTimeAbsentCount}d
+                                  </span>
+                                </td>
+                                <td className="py-2.5 pr-3">
+                                  {sum.allTimeAbsentDates.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1">
+                                      {sum.allTimeAbsentDates.map((d) => (
+                                        <span
+                                          key={d}
+                                          className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-mono font-bold text-[11px]"
+                                        >
+                                          {d}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <span className="text-emerald-700 font-semibold">
+                                      No Absences (0 Chutti)
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2.5">
+                                  <div className="flex flex-wrap gap-1">
+                                    {sum.allTimePresentDates.map((d) => (
+                                      <span
+                                        key={d}
+                                        className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono text-[11px]"
+                                      >
+                                        {d}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Table B: Date-by-Date Attendance Log */}
+                  <div className="overflow-x-auto">
+                    <div className="text-xs font-bold text-slate-800 mb-2">
+                      Date-Wise Staff Attendance History Log (Har Din Ka Hazir / Ghair Hazir Record)
+                    </div>
+                    <table className="w-full text-left border-collapse text-xs">
+                      <thead>
+                        <tr className="border-b border-slate-200 text-slate-500">
+                          <th className="py-2 font-medium">Date &amp; Month</th>
+                          <th className="py-2 font-medium">Staff Member &amp; Role</th>
+                          <th className="py-2 font-medium">Department</th>
+                          <th className="py-2 font-medium">Attendance Status</th>
+                          <th className="py-2 font-medium">Remarks / Note</th>
+                          <th className="py-2 font-medium text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {staffAttendance
+                          .filter((a) => {
+                            const q = (staffSearch || globalSearchQuery).trim().toLowerCase();
+                            if (!q) return true;
+                            return (
+                              a.employeeName.toLowerCase().includes(q) ||
+                              a.designation.toLowerCase().includes(q) ||
+                              a.empCode.toLowerCase().includes(q) ||
+                              a.date.toLowerCase().includes(q) ||
+                              a.month.toLowerCase().includes(q) ||
+                              a.status.toLowerCase().includes(q)
+                            );
+                          })
+                          .slice(0, 60)
+                          .map((att) => (
+                            <tr key={att.id} className="hover:bg-slate-50">
+                              <td className="py-2 font-mono font-bold text-slate-900 whitespace-nowrap">
+                                {att.date}{' '}
+                                <span className="text-slate-400 font-normal">({att.month})</span>
+                              </td>
+                              <td className="py-2">
+                                <span className="font-semibold text-slate-900">
+                                  {att.employeeName}
+                                </span>{' '}
+                                <span className="text-slate-500">
+                                  ({att.empCode} · {att.designation})
+                                </span>
+                              </td>
+                              <td className="py-2 font-mono text-slate-600">{att.department}</td>
+                              <td className="py-2">
+                                {att.status === 'PRESENT' ? (
+                                  <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[10px]">
+                                    PRESENT (HAZIR)
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded bg-rose-100 text-rose-800 font-bold text-[10px]">
+                                    ABSENT (GHAIR HAZIR / CHUTTI)
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2 text-slate-600">{att.remarks || '—'}</td>
+                              <td className="py-2 text-right whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    handleDeleteRecord(
+                                      'staff-attendance',
+                                      att.id,
+                                      `Attendance ${att.employeeName} (${att.date})`
+                                    )
+                                  }
+                                  className="px-2 py-1 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded inline-flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                  <span>Delete</span>
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
@@ -5401,7 +6411,27 @@ export default function App() {
                             <td className="py-2.5 text-right font-mono tabular-nums font-bold text-rose-700">
                               -{ex.amount.toLocaleString()}
                             </td>
-                            <td className="py-2.5 text-right whitespace-nowrap">
+                            <td className="py-2.5 text-right whitespace-nowrap space-x-1.5">
+                              <button
+                                type="button"
+                                onClick={() => setPrintableDoc(expenseToPrintableInvoice(ex))}
+                                className="px-2 py-1 text-xs font-medium text-slate-800 border border-slate-300 rounded hover:bg-slate-100 inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <Printer className="w-3 h-3" />
+                                <span>Print Voucher</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const doc = expenseToPrintableInvoice(ex);
+                                  setPrintableDoc(doc);
+                                  printViaConnectedPrinter(doc, settings, 'A4');
+                                }}
+                                className="px-2 py-1 text-xs font-semibold text-white bg-[#1D5464] hover:bg-[#16424F] rounded inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <Printer className="w-3 h-3" />
+                                <span>Printer</span>
+                              </button>
                               <button
                                 type="button"
                                 onClick={() =>
@@ -5509,7 +6539,20 @@ export default function App() {
                                 className="px-2 py-1 text-xs font-semibold text-slate-900 border border-slate-300 rounded hover:bg-slate-100 inline-flex items-center gap-1 cursor-pointer"
                               >
                                 <Printer className="w-3 h-3" />
-                                <span>Print</span>
+                                <span>View / Virtual</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const doc: PrintableDocPayload = { type: 'INVOICE', data: inv };
+                                  setPrintableDoc(doc);
+                                  printViaConnectedPrinter(doc, settings, 'A4');
+                                }}
+                                className="px-2 py-1 text-xs font-semibold text-white bg-[#1D5464] hover:bg-[#16424F] rounded inline-flex items-center gap-1 cursor-pointer"
+                                title="Send directly to connected printer"
+                              >
+                                <Printer className="w-3 h-3" />
+                                <span>Printer</span>
                               </button>
                               {due > 0 && (
                                 <button
@@ -5629,6 +6672,122 @@ export default function App() {
                       {laptopFolderName} · {lastAutoSavedTime}
                     </span>
                   </div>
+                </div>
+              </div>
+
+              {/* 1B. Daily Patients & Staff Attendance (Hazir / Ghair Hazir) History Register */}
+              <div className="bg-white border border-slate-200 rounded-xl p-5 shadow-xs space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200">
+                  <div>
+                    <h2 className="text-base font-bold text-slate-900">
+                      01-B. Daily Patients &amp; Staff Attendance History (Din ke Hisab se Patients aur Staff Hazri / Chuttiyan)
+                    </h2>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Automatically saves daily Patients Present, Staff Present (Hazir), Staff Absent (Ghair Hazir / Chutti), and Monthly Chuttiyan
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigateToOption('billing_hr')}
+                    className="px-3.5 py-2 rounded-lg bg-[#1D5464] hover:bg-[#16424F] text-white text-xs font-semibold cursor-pointer"
+                  >
+                    Mark / Edit Staff Attendance
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-xs">
+                    <thead>
+                      <tr className="border-b border-slate-200 text-slate-500">
+                        <th className="py-2 font-medium">Date</th>
+                        <th className="py-2 font-medium">Total Patients on Date</th>
+                        <th className="py-2 font-medium">Date Patient Bills &amp; Total Amount</th>
+                        <th className="py-2 font-medium">Staff Present (Hazir)</th>
+                        <th className="py-2 font-medium">Staff Absent (Ghair Hazir / Chutti)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {allRecordedHistoryDates
+                        .filter((d) => {
+                          const q = (historySearch || globalSearchQuery).trim().toLowerCase();
+                          if (!q) return true;
+                          return d.toLowerCase().includes(q);
+                        })
+                        .slice(0, 15)
+                        .map((dateStr) => {
+                          const dayInvoices = invoices.filter(
+                            (i) =>
+                              i.businessDate === dateStr &&
+                              !i.department.startsWith('PHARMACY_WHOLESALE')
+                          );
+                          const dayTotalBilled = dayInvoices
+                            .filter((i) => i.status !== 'REFUNDED')
+                            .reduce((acc, i) => acc + i.netTotal, 0);
+                          const dayPatients = Array.from(
+                            new Set([
+                              ...patients
+                                .filter((p) => p.registeredBusinessDate === dateStr)
+                                .map((p) => p.fullName),
+                              ...encounters
+                                .filter((e) => e.businessDate === dateStr)
+                                .map((e) => e.patientName),
+                              ...dayInvoices.map((i) => i.customerName),
+                            ])
+                          );
+                          const dayAtt = staffAttendance.filter((a) => a.date === dateStr);
+                          const presentNames =
+                            dayAtt.length > 0
+                              ? dayAtt
+                                  .filter((a) => a.status === 'PRESENT')
+                                  .map((a) => a.employeeName)
+                              : dateStr === selectedDayStr
+                              ? employees.map((e) => e.fullName)
+                              : [];
+                          const absentNames = dayAtt
+                            .filter((a) => a.status !== 'PRESENT')
+                            .map((a) => `${a.employeeName} (${a.remarks || 'Absent'})`);
+                          return (
+                            <tr key={dateStr} className="hover:bg-slate-50">
+                              <td className="py-2.5 font-mono font-bold text-slate-900 whitespace-nowrap">
+                                {dateStr}
+                              </td>
+                              <td className="py-2.5">
+                                <span className="font-bold text-[#1D5464]">
+                                  Total Patients: {dayPatients.length}
+                                </span>{' '}
+                                <span className="text-slate-700">
+                                  ({dayPatients.join(', ') || 'No patient entries'})
+                                </span>
+                              </td>
+                              <td className="py-2.5 font-mono">
+                                <span className="font-bold text-slate-900">
+                                  {dayInvoices.length} Bills · Total: {dayTotalBilled.toLocaleString()} {cur}
+                                </span>
+                              </td>
+                              <td className="py-2.5">
+                                <span className="font-bold text-emerald-700">
+                                  {presentNames.length} Present:
+                                </span>{' '}
+                                <span className="text-slate-700">
+                                  {presentNames.join(', ') || '—'}
+                                </span>
+                              </td>
+                              <td className="py-2.5">
+                                {absentNames.length > 0 ? (
+                                  <span className="font-bold text-rose-700">
+                                    {absentNames.length} Absent: {absentNames.join(', ')}
+                                  </span>
+                                ) : (
+                                  <span className="text-emerald-700 font-semibold">
+                                    0 Absent (All Present)
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
@@ -5759,7 +6918,37 @@ export default function App() {
                                   <span className="text-slate-500">Asset / Stock</span>
                                 )}
                               </td>
-                              <td className="py-2.5 text-right whitespace-nowrap">
+                              <td className="py-2.5 text-right whitespace-nowrap space-x-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const matchedInv = invoices.find((i) => i.id === j.referenceId);
+                                    const doc = matchedInv
+                                      ? ({ type: 'INVOICE', data: matchedInv } as PrintableDocPayload)
+                                      : journalEntryToPrintableInvoice(j);
+                                    setPrintableDoc(doc);
+                                  }}
+                                  className="px-2 py-1 text-xs font-medium text-slate-800 border border-slate-300 rounded hover:bg-slate-100 inline-flex items-center gap-1 cursor-pointer"
+                                >
+                                  <Printer className="w-3 h-3" />
+                                  <span>Print</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const matchedInv = invoices.find((i) => i.id === j.referenceId);
+                                    const doc = matchedInv
+                                      ? ({ type: 'INVOICE', data: matchedInv } as PrintableDocPayload)
+                                      : journalEntryToPrintableInvoice(j);
+                                    setPrintableDoc(doc);
+                                    printViaConnectedPrinter(doc, settings, 'A4');
+                                  }}
+                                  className="px-2 py-1 text-xs font-semibold text-white bg-[#1D5464] hover:bg-[#16424F] rounded inline-flex items-center gap-1 cursor-pointer"
+                                  title="Print directly on connected printer"
+                                >
+                                  <Printer className="w-3 h-3" />
+                                  <span>Printer</span>
+                                </button>
                                 <button
                                   type="button"
                                   onClick={() =>
@@ -5859,7 +7048,7 @@ export default function App() {
           />
 
           {/* Quiet Authoritative Footer */}
-          <footer className="mt-auto border-t border-slate-200/80 bg-white px-6 py-3.5 text-xs text-slate-500">
+          <footer className="no-print mt-auto border-t border-slate-200/80 bg-white px-6 py-3.5 text-xs text-slate-500">
             <div className="max-w-[1400px] mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
               <div>
                 {settings.hospitalName} · Central Database &amp; Financial Management System

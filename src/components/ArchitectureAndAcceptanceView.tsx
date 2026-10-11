@@ -1,13 +1,11 @@
 /**
  * Network Architecture, Security Model, AES-256-GCM Backups, Isolated Restore & Go-Live Acceptance Suite
- * Branded with: Developed by Sajjad Qaiser Shah
  */
 import React, { useState } from 'react';
 import {
   ShieldCheck,
   Database,
   HardDriveDownload,
-  RefreshCw,
   CheckCircle2,
   Lock,
   Server,
@@ -90,7 +88,7 @@ export const ArchitectureAndAcceptanceView: React.FC<ArchitectureAndAcceptanceVi
       [
         JSON.stringify(
           {
-            header: 'HOSPITAL_ERP_DISCONNECTED_OFFLINE_BACKUP — Developed by Sajjad Qaiser Shah',
+            header: 'HOSPITAL_ERP_DISCONNECTED_OFFLINE_BACKUP',
             filename: b.filename,
             cipherAlgorithm: b.cipherAlgorithm,
             sha256Checksum: b.sha256Checksum,
@@ -411,6 +409,7 @@ export const ArchitectureAndAcceptanceView: React.FC<ArchitectureAndAcceptanceVi
                 <label className="block text-slate-600 mb-1">Admin Login Username</label>
                 <input
                   type="text"
+                  autoComplete="username"
                   value={settingsForm.adminUsername}
                   onChange={(e) =>
                     setSettingsForm({ ...settingsForm, adminUsername: e.target.value })
@@ -422,6 +421,7 @@ export const ArchitectureAndAcceptanceView: React.FC<ArchitectureAndAcceptanceVi
                 <label className="block text-slate-600 mb-1">New Admin Password</label>
                 <input
                   type="password"
+                  autoComplete="new-password"
                   value={settingsForm.adminPassword}
                   onChange={(e) =>
                     setSettingsForm({ ...settingsForm, adminPassword: e.target.value })

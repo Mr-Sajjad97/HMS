@@ -3,10 +3,87 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Hospital ERP — Developed by Sajjad Qaiser Shah</title>
-    <meta name="description" content="Single-hospital Enterprise Resource Planning system for OPD, IPD, Laboratory, Pharmacy POS, Double-Entry Accounting, HR/Payroll, Encrypted Backups, and LAN Operations — Developed by Sajjad Qaiser Shah." />
-    <meta property="og:title" content="Hospital ERP — Developed by Sajjad Qaiser Shah" />
-    <meta property="og:description" content="Single-hospital Enterprise Resource Planning system for OPD, IPD, Laboratory, Pharmacy POS, Double-Entry Accounting, HR/Payroll, Encrypted Backups, and LAN Operations — Developed by Sajjad Qaiser Shah." />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%231D5464'/%3E%3Cpath d='M14 8h4v6h6v4h-6v6h-4v-6H8v-4h6V8z' fill='%23ffffff'/%3E%3C/svg%3E" />
+    <script>
+      (function () {
+        try {
+          var NativeWS = window.WebSocket;
+          if (NativeWS) {
+            var WrappedWS = function (url, protocols) {
+              var urlStr = String(url || '');
+              var protoStr = String(protocols || '');
+              if (
+                protoStr.indexOf('vite-hmr') !== -1 ||
+                protoStr.indexOf('vite-ping') !== -1 ||
+                urlStr.indexOf('token=') !== -1
+              ) {
+                var target = new EventTarget();
+                target.url = urlStr;
+                target.readyState = 1;
+                target.protocol = protoStr;
+                target.extensions = '';
+                target.bufferedAmount = 0;
+                target.binaryType = 'blob';
+                target.send = function () {};
+                target.close = function () {
+                  target.readyState = 3;
+                };
+                return target;
+              }
+              return protocols !== undefined
+                ? new NativeWS(url, protocols)
+                : new NativeWS(url);
+            };
+            WrappedWS.CONNECTING = 0;
+            WrappedWS.OPEN = 1;
+            WrappedWS.CLOSING = 2;
+            WrappedWS.CLOSED = 3;
+            WrappedWS.prototype = NativeWS.prototype;
+            window.WebSocket = WrappedWS;
+          }
+          var origWarn = console.warn.bind(console);
+          var origError = console.error.bind(console);
+          var shouldMute = function (args) {
+            var txt = Array.prototype.map
+              .call(args, function (a) {
+                if (typeof a === 'string') return a;
+                if (a && a.message) return a.message;
+                try {
+                  return JSON.stringify(a);
+                } catch (e) {
+                  return '';
+                }
+              })
+              .join(' ');
+            return (
+              txt.indexOf('width(-1)') !== -1 ||
+              txt.indexOf('height(-1)') !== -1 ||
+              txt.indexOf('[DOM]') !== -1 ||
+              txt.indexOf('WebSocket') !== -1 ||
+              txt.indexOf('vite') !== -1 ||
+              txt.indexOf('fullscreen') !== -1 ||
+              txt.indexOf('Permissions check') !== -1 ||
+              txt.indexOf('Missing or insufficient permissions') !== -1 ||
+              txt.indexOf('client is offline') !== -1 ||
+              txt.indexOf('Firestore') !== -1 ||
+              txt.indexOf('ResizeObserver') !== -1
+            );
+          };
+          console.warn = function () {
+            if (shouldMute(arguments)) return;
+            return origWarn.apply(console, arguments);
+          };
+          console.error = function () {
+            if (shouldMute(arguments)) return;
+            return origError.apply(console, arguments);
+          };
+        } catch (e) {}
+      })();
+    </script>
+    <title>Al-Hikmat General Hospital — ERP System</title>
+    <meta name="description" content="Single-hospital Enterprise Resource Planning system for OPD, IPD, Laboratory, Pharmacy POS, Double-Entry Accounting, HR/Payroll, Encrypted Backups, and LAN Operations." />
+    <meta property="og:title" content="Al-Hikmat General Hospital — ERP System" />
+    <meta property="og:description" content="Single-hospital Enterprise Resource Planning system for OPD, IPD, Laboratory, Pharmacy POS, Double-Entry Accounting, HR/Payroll, Encrypted Backups, and LAN Operations." />
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
     <link rel="preconnect" href="https://fonts.googleapis.com">

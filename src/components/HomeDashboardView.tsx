@@ -40,6 +40,7 @@ import type {
 
 export type HomeTargetModule =
   | 'home'
+  | 'patient_billing'
   | 'clinical'
   | 'laboratory'
   | 'pharmacy'
@@ -495,8 +496,8 @@ export const HomeDashboardView: React.FC<HomeDashboardViewProps> = ({
           </div>
         </div>
 
-        <div className="h-80 w-full">
-          <ResponsiveContainer width="100%" height="100%">
+        <div className="h-80 w-full min-w-0">
+          <ResponsiveContainer width="100%" height={300} minWidth={100} minHeight={240}>
             <ComposedChart
               data={filteredChartData}
               margin={{ top: 10, right: 20, left: 10, bottom: 5 }}
